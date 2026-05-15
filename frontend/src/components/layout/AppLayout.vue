@@ -6,29 +6,33 @@ import BottomNav from './BottomNav.vue'
 
 <template>
   <div class="app-layout min-h-screen" style="background: var(--color-bg-primary)">
-    <!-- Top Header -->
+    <!-- Top Header (fixed, z-50) -->
     <AppHeader />
 
-    <!-- Sidebar (Desktop) -->
+    <!-- Sidebar (desktop only, fixed left, z-40) -->
     <AppSidebar />
 
     <!-- Main Content Area -->
     <main
-      class="main-content pt-16 pb-20 lg:pb-4 transition-all duration-300"
-      :class="{ 'lg:ml-60': true }"
+      class="main-content min-h-screen transition-all duration-300"
+      :class="[
+        'pt-[4rem] pb-[4.5rem] lg:pb-6',
+        'lg:pl-[15rem]',
+      ]"
     >
       <div class="content-wrapper p-4 lg:p-6 max-w-7xl mx-auto">
         <slot />
       </div>
     </main>
 
-    <!-- Bottom Navigation (Mobile) -->
+    <!-- Bottom Navigation (mobile only, fixed bottom, z-50) -->
     <BottomNav />
   </div>
 </template>
 
 <style scoped>
 .main-content {
-  min-height: 100vh;
+  position: relative;
+  z-index: 1;
 }
 </style>

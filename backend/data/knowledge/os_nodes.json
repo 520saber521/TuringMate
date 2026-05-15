@@ -1,0 +1,12 @@
+[
+  {"id": "os_01", "name": "操作系统概述", "subject": "os", "prerequisites": [], "related": ["co_01"]},
+  {"id": "os_02", "name": "进程管理", "subject": "os", "prerequisites": ["os_01"], "related": ["os_03", "co_10"]},
+  {"id": "os_03", "name": "进程同步与互斥", "subject": "os", "prerequisites": ["os_02"], "related": ["os_02", "ds_03"]},
+  {"id": "os_04", "name": "死锁", "subject": "os", "prerequisites": ["os_03"], "related": ["os_03"]},
+  {"id": "os_05", "name": "内存管理", "subject": "os", "prerequisites": ["os_01"], "related": ["co_03", "co_09"]},
+  {"id": "os_06", "name": "虚拟内存", "subject": "os", "prerequisites": ["os_05"], "related": ["os_05", "co_03"]},
+  {"id": "os_07", "name": "文件管理", "subject": "os", "prerequisites": ["os_01"], "related": ["os_08"]},
+  {"id": "os_08", "name": "I/O管理", "subject": "os", "prerequisites": ["os_01"], "related": ["co_07", "os_07"]},
+  {"id": "os_09", "name": "磁盘调度", "subject": "os", "prerequisites": ["os_08"], "related": ["os_08", "ds_07"]},
+  {"id": "os_10", "name": "设备管理", "subject": "os", "prerequisites": ["os_08"], "related": ["os_08", "co_07"]}
+]

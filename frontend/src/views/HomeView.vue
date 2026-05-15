@@ -10,11 +10,22 @@ import {
   Flame,
   ChevronRight,
   BookOpen,
+  MessageCircle,
 } from 'lucide-vue-next'
 
 const router = useRouter()
 
 const quickActions = [
+  {
+    key: 'chat',
+    label: '引导对话',
+    desc: '苏格拉底式教学',
+    icon: MessageCircle,
+    path: '/chat/demo',
+    gradient: 'from-purple-500 to-violet-500',
+    bgColor: 'bg-purple-50/60',
+    iconColor: '#6C5CE7',
+  },
   {
     key: 'photo',
     label: '拍照搜题',
@@ -22,7 +33,7 @@ const quickActions = [
     icon: Camera,
     path: '/photo-search',
     gradient: 'from-blue-500 to-indigo-500',
-    bgColor: 'bg-blue-50',
+    bgColor: 'bg-blue-50/60',
     iconColor: '#3B82F6',
   },
   {
@@ -32,7 +43,7 @@ const quickActions = [
     icon: PenTool,
     path: '/correction',
     gradient: 'from-emerald-500 to-teal-500',
-    bgColor: 'bg-emerald-50',
+    bgColor: 'bg-emerald-50/60',
     iconColor: '#10B981',
   },
   {
@@ -42,7 +53,7 @@ const quickActions = [
     icon: BarChart3,
     path: '/diagnosis',
     gradient: 'from-amber-500 to-orange-500',
-    bgColor: 'bg-amber-50',
+    bgColor: 'bg-amber-50/60',
     iconColor: '#F59E0B',
   },
   {
@@ -52,7 +63,7 @@ const quickActions = [
     icon: Code2,
     path: '/visualize',
     gradient: 'from-rose-500 to-pink-500',
-    bgColor: 'bg-rose-50',
+    bgColor: 'bg-rose-50/60',
     iconColor: '#EF4444',
   },
 ]
@@ -85,11 +96,10 @@ const subjectColorMap: Record<string, string> = {
 <template>
   <div class="home-view animate-fade-in-up">
     <!-- Welcome Banner -->
-    <section class="welcome-section mb-6">
-      <div class="glass-card p-6 !rounded-2xl relative overflow-hidden">
-        <!-- Background decoration -->
-        <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-purple-100 opacity-50"></div>
-        <div class="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-indigo-50 opacity-60"></div>
+    <section class="mb-6">
+      <div class="glass-card-static p-6 !rounded-2xl relative overflow-hidden">
+        <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-purple-100/50"></div>
+        <div class="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-indigo-50/60"></div>
 
         <div class="relative z-10 flex items-center justify-between">
           <div>
@@ -101,26 +111,27 @@ const subjectColorMap: Record<string, string> = {
               距离考研还有 <span class="font-semibold" style="color: var(--color-primary)">218</span> 天
             </p>
           </div>
-          <BookOpen :size="48" class="opacity-20" style="color: var(--color-primary)" />
+          <BookOpen :size="48" class="opacity-20 flex-shrink-0" style="color: var(--color-primary)" />
         </div>
       </div>
     </section>
 
     <!-- Quick Actions Grid -->
-    <section class="quick-actions mb-6">
+    <section class="mb-6">
       <h3 class="text-base font-semibold mb-3" style="color: var(--color-text-primary)">快捷功能</h3>
-      <div class="grid grid-cols-2 gap-3">
+      <!-- 5 items: 2 cols on mobile, 3 cols on sm+, last item spans or centers -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <button
           v-for="action in quickActions"
           :key="action.key"
           :class="[
-            'glass-card !rounded-2xl p-5 text-left transition-all duration-200 active:scale-[0.97]',
+            'quick-card !rounded-2xl p-5 text-left transition-all duration-200 active:scale-[0.97]',
             action.bgColor
           ]"
           @click="goTo(action.path)"
         >
           <div
-            :class="['w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br', action.gradient]"
+            :class="['w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br shadow-sm', action.gradient]"
           >
             <component :is="action.icon" :size="22" class="text-white" />
           </div>
@@ -131,13 +142,13 @@ const subjectColorMap: Record<string, string> = {
     </section>
 
     <!-- Stats Cards -->
-    <section class="stats-section mb-6">
+    <section class="mb-6">
       <h3 class="text-base font-semibold mb-3" style="color: var(--color-text-primary)">今日统计</h3>
       <div class="grid grid-cols-3 gap-3">
         <div
           v-for="stat in stats"
           :key="stat.label"
-          class="glass-card !rounded-2xl p-4 text-center"
+          class="glass-card-static !rounded-2xl p-4 text-center"
         >
           <div
             class="w-10 h-10 rounded-xl mx-auto flex items-center justify-center mb-2"
@@ -154,10 +165,10 @@ const subjectColorMap: Record<string, string> = {
     </section>
 
     <!-- Recent Practice -->
-    <section class="recent-practice mb-24 lg:mb-4">
+    <section class="recent-practice pb-4 lg:pb-0">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold" style="color: var(--color-text-primary)">最近练习</h3>
-        <button class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg hover:bg-purple-50 transition-colors" style="color: var(--color-primary)">
+        <button class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg hover:bg-purple-50 transition-colors active:scale-95" style="color: var(--color-primary)">
           查看全部
           <ChevronRight :size="14" />
         </button>
@@ -167,7 +178,7 @@ const subjectColorMap: Record<string, string> = {
         <div
           v-for="item in recentPractices"
           :key="item.id"
-          class="glass-card !rounded-2xl p-4 min-w-[260px] max-w-[280px] flex-shrink-0 cursor-pointer hover:shadow-lg transition-shadow"
+          class="glass-card-static !rounded-2xl p-4 min-w-[260px] max-w-[280px] flex-shrink-0 cursor-pointer hover:shadow-lg transition-shadow"
           @click="goTo(`/chat/${item.id}`)"
         >
           <div class="flex items-start justify-between mb-3">
@@ -216,6 +227,30 @@ const subjectColorMap: Record<string, string> = {
 </template>
 
 <style scoped>
+/* Static glass card - no hover translateY to prevent layout shift */
+.glass-card-static {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(108, 92, 231, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(108, 92, 231, 0.08);
+}
+
+/* Quick card - subtle hover only, no vertical shift */
+.quick-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(108, 92, 231, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(108, 92, 231, 0.08);
+}
+
+.quick-card:hover {
+  box-shadow: 0 12px 40px rgba(108, 92, 231, 0.15);
+}
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }

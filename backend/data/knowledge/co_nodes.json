@@ -1,0 +1,12 @@
+[
+  {"id": "co_01", "name": "计算机系统概述", "subject": "co", "prerequisites": [], "related": ["os_01"]},
+  {"id": "co_02", "name": "数据的表示和运算", "subject": "co", "prerequisites": ["co_01"], "related": ["co_03"]},
+  {"id": "co_03", "name": "存储系统", "subject": "co", "prerequisites": ["co_02"], "related": ["co_02", "os_05"]},
+  {"id": "co_04", "name": "指令系统", "subject": "co", "prerequisites": ["co_02"], "related": ["co_05"]},
+  {"id": "co_05", "name": "中央处理器", "subject": "co", "prerequisites": ["co_04"], "related": ["co_04", "co_06"]},
+  {"id": "co_06", "name": "总线", "subject": "co", "prerequisites": ["co_01"], "related": ["co_05", "co_07"]},
+  {"id": "co_07", "name": "I/O系统", "subject": "co", "prerequisites": ["co_06"], "related": ["co_06", "os_06"]},
+  {"id": "co_08", "name": "流水线技术", "subject": "co", "prerequisites": ["co_05"], "related": ["co_05"]},
+  {"id": "co_09", "name": "Cache原理", "subject": "co", "prerequisites": ["co_03"], "related": ["co_03", "os_05"]},
+  {"id": "co_10", "name": "中断机制", "subject": "co", "prerequisites": ["co_07"], "related": ["co_07", "os_04"]}
+]

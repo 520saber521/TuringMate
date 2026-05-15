@@ -1,0 +1,12 @@
+[
+  {"id": "ds_01", "name": "线性表", "subject": "ds", "prerequisites": [], "related": ["ds_02", "ds_03"]},
+  {"id": "ds_02", "name": "链表", "subject": "ds", "prerequisites": ["ds_01"], "related": ["ds_01", "co_04"]},
+  {"id": "ds_03", "name": "栈和队列", "subject": "ds", "prerequisites": ["ds_01"], "related": ["ds_01", "os_03"]},
+  {"id": "ds_04", "name": "树与二叉树", "subject": "ds", "prerequisites": ["ds_01"], "related": ["ds_05", "ds_08"]},
+  {"id": "ds_05", "name": "图", "subject": "ds", "prerequisites": ["ds_04"], "related": ["ds_04", "cn_01"]},
+  {"id": "ds_06", "name": "查找", "subject": "ds", "prerequisites": ["ds_04"], "related": ["ds_04", "ds_07"]},
+  {"id": "ds_07", "name": "排序", "subject": "ds", "prerequisites": ["ds_01"], "related": ["ds_06", "ds_08"]},
+  {"id": "ds_08", "name": "哈希表", "subject": "ds", "prerequisites": ["ds_01"], "related": ["ds_06", "ds_07"]},
+  {"id": "ds_09", "name": "字符串模式匹配", "subject": "ds", "prerequisites": ["ds_01"], "related": ["ds_02"]},
+  {"id": "ds_10", "name": "B树和B+树", "subject": "ds", "prerequisites": ["ds_04"], "related": ["ds_04", "ds_06"]}
+]

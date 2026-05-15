@@ -6,7 +6,7 @@
    ============================================ */
 
 /* --- Design Tokens (CSS Variables) --- */
-:root {
+::root {
   /* Primary - Purple */
   --color-primary: #6C5CE7;
   --color-primary-light: #7C6CF0;
@@ -52,6 +52,7 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -60,6 +61,7 @@ body {
   background: var(--color-bg-primary);
   line-height: 1.6;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* --- Glassmorphism Utility Classes --- */
@@ -72,6 +74,11 @@ body {
   box-shadow: var(--glass-shadow);
 }
 
+/*
+  glass-card: Base card style.
+  NOTE: No global hover transform to avoid layout shifts.
+  Use hover:shadow-lg for subtle feedback instead.
+*/
 .glass-card {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: var(--glass-blur);
@@ -79,12 +86,12 @@ body {
   border: 1px solid rgba(108, 92, 231, 0.08);
   border-radius: 16px;
   box-shadow: var(--glass-shadow);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.25s ease;
 }
 
 .glass-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 12px 40px rgba(108, 92, 231, 0.15);
+  /* NO translateY — prevents layout shifts and overlapping */
 }
 
 /* --- Gradient Utilities --- */
@@ -127,6 +134,7 @@ body {
 /* --- Scrollbar Styling --- */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -143,4 +151,13 @@ body {
 ::selection {
   background: rgba(108, 92, 231, 0.2);
   color: var(--color-text-primary);
+}
+
+/* --- Focus Ring Utility --- */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(108, 92, 231, 0.4);
+  outline-offset: 2px;
 }

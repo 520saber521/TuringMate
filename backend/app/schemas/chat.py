@@ -1,6 +1,6 @@
 """Chat schemas."""
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, Optional
 
 
 class ChatStartRequest(BaseModel):

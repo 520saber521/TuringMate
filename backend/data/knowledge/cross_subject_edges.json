@@ -1,0 +1,13 @@
+[
+  {"source": "ds_02", "target": "co_04", "relation": "链表指针 ↔ 指令寻址", "strength": 0.4},
+  {"source": "ds_03", "target": "os_03", "relation": "栈 ↔ 进程调度队列", "strength": 0.5},
+  {"source": "ds_05", "target": "cn_01", "relation": "图算法 ↔ 网络拓扑", "strength": 0.6},
+  {"source": "ds_07", "target": "os_09", "relation": "排序 ↔ 磁盘调度算法", "strength": 0.4},
+  {"source": "co_03", "target": "os_05", "relation": "存储系统 ↔ 内存管理", "strength": 0.8},
+  {"source": "co_09", "target": "os_06", "relation": "Cache ↔ 虚拟内存", "strength": 0.7},
+  {"source": "co_07", "target": "os_08", "relation": "I/O系统 ↔ I/O管理", "strength": 0.8},
+  {"source": "co_10", "target": "os_04", "relation": "中断 ↔ 死锁检测", "strength": 0.3},
+  {"source": "os_03", "target": "ds_03", "relation": "进程同步 ↔ 队列", "strength": 0.5},
+  {"source": "cn_07", "target": "os_02", "relation": "TCP ↔ 进程通信", "strength": 0.5},
+  {"source": "cn_09", "target": "ds_08", "relation": "子网划分 ↔ 哈希", "strength": 0.3}
+]

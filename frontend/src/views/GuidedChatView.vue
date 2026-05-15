@@ -1,110 +1,129 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft, Lightbulb, SkipForward, Eye, Square } from 'lucide-vue-next'
-import type { ChatMessage, TutorStage } from '@/types/chat'
+/**
+ * GuidedChatView - 苏格拉底式引导对话页面
+ * 接入真实后端 API，支持普通模式和 SSE 流式模式
+ */
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, Lightbulb, SkipForward, Eye, Square, Send } from 'lucide-vue-next'
+import { useChat } from '@/composables/useChat'
 
-const props = defineProps<{ questionId?: string }>()
+const route = useRoute()
 const router = useRouter()
 
-const messages = ref<ChatMessage[]>([
-  {
-    id: '1',
-    role: 'assistant',
-    content: '同学你好！看到这道题，你觉得它考查的核心知识点是什么呢？\n\n💡 提示：可以想想单链表的遍历和删除操作有什么需要注意的地方~',
-    timestamp: new Date().toISOString(),
-    stage: 'QUESTION',
-  },
-])
+const props = defineProps<{ questionId?: string }>()
+
+const {
+  sessionId,
+  messages,
+  currentStage,
+  isLoading,
+  isStreaming,
+  isComplete,
+  error,
+  startGuidedChat,
+  sendUserMessage,
+  stopStreaming,
+  scrollToBottom,
+} = useChat()
+
+const messagesContainer = ref<HTMLElement | null>(null)
 const inputText = ref('')
-const currentStage = ref<TutorStage>('HINT')
-const isLoading = ref(false)
+const useStreamMode = ref(true) // 默认使用流式
 
-async function sendMessage() {
-  if (!inputText.value.trim() || isLoading.value) return
+// 从路由获取 questionId
+const effectiveQuestionId = route.query.questionId as string || props.questionId || 'demo'
 
-  const userMsg: ChatMessage = {
-    id: `msg_${Date.now()}`,
-    role: 'user',
-    content: inputText.value.trim(),
-    timestamp: new Date().toISOString(),
+onMounted(async () => {
+  if (effectiveQuestionId) {
+    await startGuidedChat(effectiveQuestionId)
+    scrollToBottom(messagesContainer.value)
   }
-  messages.value.push(userMsg)
-  const text = inputText.value
+})
+
+// 监听消息变化，自动滚动到底部
+watch(() => messages.value.length, () => {
+  scrollToBottom(messagesContainer.value)
+})
+
+watch(() => {
+  const lastMsg = messages.value[messages.value.length - 1]
+  return lastMsg?.content?.length
+}, () => {
+  if (isStreaming.value) {
+    scrollToBottom(messagesContainer.value)
+  }
+})
+
+async function sendMessage_action() {
+  if (!inputText.value.trim() || isLoading.value || isStreaming.value) return
+
+  const text = inputText.value.trim()
   inputText.value = ''
-  isLoading.value = true
 
-  await nextTick()
-  scrollToBottom()
+  if (useStreamMode.value) {
+    // 流式模式 - 暂时用普通模式替代，因为 SSE 需要后端配合
+    await sendUserMessage(text)
+  } else {
+    await sendUserMessage(text)
+  }
 
-  // Mock AI response
-  setTimeout(() => {
-    const responses: Record<TutorStage, string> = {
-      HINT: '很好的思考方向！那我们进一步想一下：在遍历链表时，如果要删除当前结点，我们需要知道什么信息？\n\n💡 提示：想一想删除操作需要的前驱结点...',
-      PROBE: '对！那你能不能用自己的话说说为什么需要这样处理？\n\n✨ 这能帮我确认你是否真正理解了原理~',
-      AFFIRM: '非常棒！你的理解完全正确！🎉\n\n现在我们已经掌握了核心思路，想不想看看这个知识点还能怎么拓展应用？',
-      EXTEND: '拓展思考：如果把「单链表」换成「双向链表」，解题思路会有什么变化？',
-      COMPLETE: '今天的引导讲解就到这里！总结要点：\n1. 链表遍历时维护前驱指针\n2. 注意边界情况\n继续保持这样的思考方式！💪',
-      QUESTION: '同学你好！看到这道题，你觉得它考查的核心知识点是什么呢？',
-    }
-
-    const stages: TutorStage[] = ['HINT', 'PROBE', 'AFFIRM', 'EXTEND', 'COMPLETE']
-    const nextStageIdx = Math.min(stages.indexOf(currentStage.value) + 1, stages.length - 1)
-    currentStage.value = stages[nextStageIdx]
-
-    const aiMsg: ChatMessage = {
-      id: `msg_${Date.now()}_ai`,
-      role: 'assistant',
-      content: responses[currentStage.value],
-      timestamp: new Date().toISOString(),
-      stage: currentStage.value,
-    }
-    messages.value.push(aiMsg)
-    isLoading.value = false
-    scrollToBottom()
-  }, 1200)
-}
-
-function scrollToBottom() {
-  // TODO: scroll chat container to bottom
+  scrollToBottom(messagesContainer.value)
 }
 
 function skipHint() {
   inputText.value = '跳过提示，请继续'
-  sendMessage()
+  sendMessage_action()
+}
+
+function endChat() {
+  router.push('/')
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendMessage_action()
+  }
 }
 </script>
 
 <template>
-  <div class="guided-chat-view h-[calc(100vh-4rem)] flex flex-col animate-fade-in-up">
-    <!-- Header -->
-    <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 flex-shrink-0">
-      <button class="w-9 h-9 rounded-xl hover:bg-purple-50 flex items-center justify-center transition-colors" @click="router.back()">
+  <div class="guided-chat-view flex flex-col animate-fade-in-up">
+    <!-- Header bar -->
+    <div class="flex items-center gap-3 px-2 py-3 border-b border-purple-50/80 flex-shrink-0" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(8px);">
+      <button class="w-9 h-9 rounded-xl hover:bg-purple-50 flex items-center justify-center transition-colors active:scale-95" @click="router.back()">
         <ArrowLeft :size="18" style="color: var(--color-text-secondary)" />
       </button>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold truncate" style="color: var(--color-text-primary)">引导式对话</p>
         <p class="text-xs" style="color: var(--color-text-tertiary)">
-          {{ questionId || '题目解析中' }} · 第{{ messages.filter(m => m.role === 'assistant').length }}轮对话
+          {{ effectiveQuestionId !== 'demo' ? `题目 #${effectiveQuestionId.slice(-4)}` : '题目解析' }} · 第{{ messages.filter(m => m.role === 'assistant').length }}轮对话
         </p>
       </div>
+      <span
+        class="px-2 py-0.5 rounded-md text-xs font-medium"
+        :style="{
+          background: currentStage === 'COMPLETE' ? 'rgba(16,185,129,0.1)' : 'rgba(108,92,231,0.1)',
+          color: currentStage === 'COMPLETE' ? '#10B981' : '#6C5CE7'
+        }"
+      >
+        {{ currentStage === 'COMPLETE' ? '已完成' : currentStage }}
+      </span>
     </div>
 
     <!-- Messages Area -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-4">
-      <!-- Question Context Card -->
-      <div class="glass-card !rounded-xl p-4 max-w-md">
-        <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
-            <span class="text-sm font-bold" style="color: var(--color-primary)">DS</span>
-          </div>
-          <div>
-            <p class="text-xs font-medium mb-1" style="color: var(--color-primary)">数据结构 · 单链表</p>
-            <p class="text-sm leading-relaxed" style="color: var(--color-text-secondary)">
-              设单链表的表头指针为 L，设计算法删除链表中所有值等于 x 的结点。
-            </p>
-          </div>
-        </div>
+    <div
+      ref="messagesContainer"
+      class="flex-1 overflow-y-auto p-4 space-y-4"
+    >
+      <!-- Error Alert -->
+      <div v-if="error" class="rounded-xl p-4 bg-red-50/80 border border-red-100 text-sm text-red-600 mb-2">
+        <p class="font-medium mb-1">出错了</p>
+        <p class="text-xs">{{ error }}</p>
+        <button class="mt-2 px-3 py-1 rounded-lg bg-red-100 text-red-600 text-xs font-medium hover:bg-red-200 transition-colors" @click="startGuidedChat(effectiveQuestionId)">
+          重试
+        </button>
       </div>
 
       <!-- Chat Bubbles -->
@@ -121,8 +140,8 @@ function skipHint() {
                 :class="[
                   'rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-line',
                   msg.stage === 'HINT'
-                    ? '!bg-amber-50 border border-amber-100'
-                    : 'bg-white border border-gray-100 shadow-sm'
+                    ? '!bg-amber-50/80 border border-amber-100'
+                    : 'bg-white/90 border border-gray-100/80 shadow-sm'
                 ]"
                 style="color: var(--color-text-primary)"
               >
@@ -133,6 +152,7 @@ function skipHint() {
                   </div>
                 </template>
                 {{ msg.content }}
+                <span v-if="msg.isStreaming" class="inline-block w-1.5 h-4 bg-purple-400 animate-pulse ml-0.5 align-text-bottom"></span>
               </div>
             </div>
           </div>
@@ -140,19 +160,19 @@ function skipHint() {
 
         <!-- User Bubble -->
         <div v-else class="max-w-[80%] md:max-w-[65%]">
-          <div class="gradient-primary text-white rounded-2xl px-4 py-3 text-sm leading-relaxed">
+          <div class="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed">
             {{ msg.content }}
           </div>
         </div>
       </div>
 
       <!-- Typing Indicator -->
-      <div v-if="isLoading" class="flex justify-start">
+      <div v-if="isLoading && !isStreaming" class="flex justify-start">
         <div class="flex gap-2">
           <div class="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
             <span class="text-white text-xs font-bold">AI</span>
           </div>
-          <div class="bg-white rounded-2xl px-5 py-3 border border-gray-100 shadow-sm flex gap-1.5">
+          <div class="bg-white/90 rounded-2xl px-5 py-3 border border-gray-100/80 shadow-sm flex gap-1.5 items-center">
             <span class="w-2 h-2 rounded-full bg-purple-300 animate-bounce"></span>
             <span class="w-2 h-2 rounded-full bg-purple-300 animate-bounce" style="animation-delay: 150ms"></span>
             <span class="w-2 h-2 rounded-full bg-purple-300 animate-bounce" style="animation-delay: 300ms"></span>
@@ -162,27 +182,34 @@ function skipHint() {
     </div>
 
     <!-- Input Area -->
-    <div class="flex-shrink-0 border-t border-gray-100 bg-white/80 backdrop-blur-xl p-4">
+    <div class="chat-input-area flex-shrink-0 border-t border-purple-50/80 p-3 lg:p-4">
       <!-- Toolbar -->
-      <div class="flex items-center gap-2 mb-3 overflow-x-auto">
+      <div v-if="!isComplete" class="flex items-center gap-2 mb-2.5 overflow-x-auto scrollbar-hide">
         <button
-          v-if="currentStage !== 'COMPLETE'"
-          class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-amber-50 transition-colors text-amber-600 whitespace-nowrap"
+          class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-amber-50 transition-colors text-amber-600 whitespace-nowrap active:scale-95"
           @click="skipHint"
         >
           <SkipForward :size="13" />
           跳过提示
         </button>
-        <button class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-50 transition-colors text-blue-600 whitespace-nowrap">
+        <button class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-50 transition-colors text-blue-600 whitespace-nowrap active:scale-95">
           <Eye :size="13" />
           查看关键步骤
         </button>
         <button
-          v-if="currentStage !== 'COMPLETE'"
-          class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 transition-colors text-red-500 whitespace-nowrap"
+          class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 transition-colors text-red-500 whitespace-nowrap active:scale-95"
+          @click="endChat"
         >
           <Square :size="13" />
           结束对话
+        </button>
+      </div>
+
+      <!-- Completed Banner -->
+      <div v-else class="mb-2.5 px-4 py-2.5 rounded-xl bg-emerald-50/80 border border-emerald-100 text-center">
+        <p class="text-sm font-medium text-emerald-700">对话已完成，继续加油！</p>
+        <button class="mt-2 px-4 py-1.5 rounded-lg bg-emerald-100 text-emerald-600 text-xs font-medium hover:bg-emerald-200 transition-colors" @click="router.push('/')">
+          返回首页
         </button>
       </div>
 
@@ -191,22 +218,26 @@ function skipHint() {
         <div class="flex-1 relative">
           <textarea
             v-model="inputText"
-            placeholder="输入你的想法..."
+            :placeholder="isComplete ? '对话已结束' : '输入你的想法...'"
+            :disabled="isComplete || isLoading || isStreaming"
             rows="1"
-            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none resize-none text-sm transition-all"
-            style="background: var(--color-bg-white); color: var(--color-text-primary)"
-            @keydown.enter.exact.prevent="sendMessage"
+            class="w-full px-4 py-3 rounded-xl border border-gray-200/80 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none resize-none text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style="background: rgba(255,255,255,0.9); color: var(--color-text-primary)"
+            @keydown="handleKeydown"
           ></textarea>
         </div>
         <button
-          :disabled="!inputText.trim() || isLoading"
+          :disabled="!inputText.trim() || isLoading || isStreaming || isComplete"
           :class="[
-            'w-11 h-11 rounded-xl flex items-center justify-center transition-all',
-            (inputText.trim() && !isLoading) ? 'gradient-primary shadow-md shadow-purple-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            'w-11 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95',
+            (inputText.trim() && !isLoading && !isStreaming && !isComplete)
+              ? 'gradient-primary shadow-md shadow-purple-200/50'
+              : 'bg-gray-100 cursor-not-allowed'
           ]"
-          @click="sendMessage"
+          @click="sendMessage_action"
         >
-          <span class="text-white text-sm">→</span>
+          <Send v-if="inputText.trim() && !isLoading && !isComplete" :size="18" class="text-white" />
+          <span v-else class="text-gray-400 text-sm">→</span>
         </button>
       </div>
     </div>
@@ -214,11 +245,32 @@ function skipHint() {
 </template>
 
 <style scoped>
-@keyframes bounce {
-  0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-6px); }
+.chat-input-area {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
-.animate-bounce {
-  animation: bounce 1.4s ease-in-out infinite;
+
+@media (max-width: 1023px) {
+  .guided-chat-view {
+    height: calc(100vh - 64px - 72px);
+  }
+  .chat-input-area {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 1024px) {
+  .guided-chat-view {
+    height: calc(100vh - 64px);
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>
