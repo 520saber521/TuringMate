@@ -1,134 +1,136 @@
 """Corrector Agent - 手写批改 Agent.
 
-识别手写草稿中的每一步计算/推导过程，
-定位具体哪一步出错并标注错误类型。
-已接入 LLM Gateway 多模态能力。
+使用 LangChain 多模态能力分析学生草稿纸/手写答案，
+给出逐步骤的评分和反馈。
 """
 
 import logging
-import json
-import re
+from typing import Optional
+
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 from app.core.llm_gateway import llm_gateway
+from app.core.tools import image_ocr
 
 logger = logging.getLogger(__name__)
 
-CORRECTOR_SYSTEM_PROMPT = """你是 TuringMate 的手写批改专家，专门分析计算机考研408学生的草稿纸。
 
-请仔细观察图片中的手写解题步骤，对每一步进行判断：
+CORRECTION_SYSTEM_PROMPT = """你是计算机考研408的专业批改老师。
 
-1. 识别出所有可辨识的解题步骤
-2. 判断每一步的计算/推导是否正确
-3. 对错误步骤标注错误类型和修正提示
+请仔细分析学生手写的解题过程，按以下格式输出批改结果：
 
-输出 JSON 格式（不要输出其他文字）：
+## 批改要求：
+1. **逐步骤评分**：每个关键步骤给分（满分根据步骤数分配）
+2. **标注错误**：明确指出哪一步错了、错在哪、正确做法是什么
+3. **总体评价**：总结主要问题点和优点
+4. **改进建议**：针对薄弱点给出具体学习方向
+
+## 输出 JSON 格式：
 {
+  "total_score": 85,
+  "max_score": 100,
   "steps": [
     {
-      "step_no": 步骤序号,
-      "content": "该步骤的文字描述",
+      "step_no": 1,
+      "description": "步骤描述",
       "is_correct": true/false,
-      "error_type": "错误类型（如逻辑错误/计算错误/概念错误），正确则为null",
-      "hint": "修正提示，正确则为null"
+      "score": 10,
+      "feedback": "点评"
     }
   ],
-  "overall_feedback": "总体反馈和改进建议"
-}
-
-错误类型说明：
-- 逻辑错误：推理过程有误
-- 计算错误：数值计算出错
-- 概念错误：对基本概念理解有误
-- 遗漏步骤：缺少关键中间步骤
-"""
+  "summary": "总体评价",
+  "suggestions": ["建议1", "建议2"],
+  "weak_points": [{"topic": "知识点", "score": 70}]
+}"""
 
 
 class CorrectorAgent:
-    """批改 Agent - 分析手写步骤错误."""
+    """基于 LangChain 的批改 Agent."""
 
     def __init__(self):
-        self.llm = llm_gateway
+        self._llm = llm_gateway.get_chat_model()
+        self._prompt = ChatPromptTemplate.from_messages([
+            ("system", CORRECTION_SYSTEM_PROMPT),
+            ("human", [
+                {"type": "text", "text": "题目信息：{question_info}\n\n请批改下面学生的手写答案。"},
+                {"type": "image_url", "image_url": {"url": "{image_url}"}}
+            ]),
+        ])
 
-    async def analyze(self, image_url: str, question_id: str | None = None) -> dict:
-        """分析草稿纸图片.
+    async def correct(
+        self,
+        image_url: str,
+        question_info: Optional[dict] = None,
+    ) -> dict:
+        """执行手写答案批改.
 
         Args:
-            image_url: 草稿图片 URL 或本地路径
-            question_id: 关联题目 ID（可选）
+            image_url: 学生手写答案图片路径或 URL
+            question_info: 题目信息 {"content", "subject", "answer"}
 
         Returns:
-            每步判断结果 + 总体反馈
+            批改结果 {"total_score", "steps", "summary", ...}
         """
-        messages = [
-            {"role": "system", "content": CORRECTOR_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": "请分析这张草稿纸图片中的解题步骤，标注每一步是否正确。",
-            },
-        ]
-
         try:
-            logger.info(f"Corrector: 开始分析图片 - {image_url}")
-            raw_response = await self.llm.chat_with_image(messages, image_url)
-            logger.info(f"Corrector: LLM 响应长度: {len(raw_response)}")
+            # 使用多模态 LLM 分析图片
+            messages = [
+                SystemMessage(content=CORRECTION_SYSTEM_PROMPT),
+            ]
 
-            parsed = self._extract_json(raw_response)
-            steps = parsed.get("steps", [])
+            q_text = ""
+            if question_info:
+                parts = []
+                if question_info.get("subject"):
+                    parts.append(f"科目：{question_info['subject']}")
+                if question_info.get("content"):
+                    parts.append(f"题目：{question_info['content']}")
+                if question_info.get("answer"):
+                    parts.append(f"参考答案：{question_info['answer']}")
+                q_text = "\n".join(parts)
 
-            # 校验步骤数据
-            for i, step in enumerate(steps):
-                step.setdefault("step_no", i + 1)
-                step.setdefault("is_correct", True)
-                step.setdefault("error_type", None)
-                step.setdefault("hint", None)
+            messages.append(HumanMessage(content=f"{q_text}\n\n请批改下面学生的手写答案（图片）。"))
 
-            if not steps:
-                steps = [
-                    {"step_no": 1, "content": "未能识别出清晰步骤", "is_correct": True, "error_type": None, "hint": None}
-                ]
-
-            return {
-                "correction_id": f"corr_{hash(image_url) % 100000:05d}",
-                "question_id": question_id or "q_unknown",
-                "steps": steps,
-                "overall_feedback": parsed.get(
-                    "overall_feedback",
-                    "已分析解题过程，请查看各步骤标注。",
-                ),
-            }
+            result = await llm_gateway.chat_with_image(messages, image_url)
+            return self._extract_correction(result)
 
         except Exception as e:
-            logger.warning(f"Corrector: 分析失败 ({e})，返回 fallback")
-            return {
-                "correction_id": "corr_fallback_001",
-                "question_id": question_id or "q_unknown",
-                "steps": [
-                    {
-                        "step_no": 1,
-                        "content": "图片识别暂不可用",
-                        "is_correct": True,
-                        "error_type": None,
-                        "hint": None,
-                    }
-                ],
-                "overall_feedback": f"批改分析暂时不可用，请稍后重试。({str(e)[:50]})",
-            }
+            logger.error(f"Corrector 批改失败: {e}")
+            return self._fallback_result(str(e))
 
-    def _extract_json(self, text: str) -> dict:
-        """从 LLM 响应中提取 JSON."""
-        text = text.strip()
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
+    def _extract_correction(self, raw_response: str) -> dict:
+        """从 LLM 回复中提取结构化批改结果."""
+        import json, re
 
-        json_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if json_match:
+        try:
+            data = json.loads(raw_response.strip())
+            if "total_score" in data or "steps" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        # 提取 markdown JSON
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_response)
+        if match:
             try:
-                return json.loads(json_match.group())
+                return json.loads(match.group(1).strip())
             except json.JSONDecodeError:
                 pass
 
-        logger.warning(f"Corrector: 无法解析JSON，原文前200字: {text[:200]}")
-        return {"steps": [], "overall_feedback": text.strip()}
+        return self._fallback_result(raw_response[:500])
+
+    @staticmethod
+    def _fallback_result(error_msg: str = "") -> dict:
+        """兜底返回."""
+        return {
+            "total_score": 0,
+            "max_score": 100,
+            "steps": [],
+            "summary": f"批改服务暂时不可用: {error_msg}" if error_msg else "无法完成批改",
+            "suggestions": ["请稍后重试"],
+            "weak_points": [],
+        }
 
 
-corrector = CorrectorAgent()
+# 全局单例
+corrector_agent = CorrectorAgent()

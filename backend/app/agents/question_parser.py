@@ -1,144 +1,132 @@
-"""QuestionParser Agent - 题目识别 Agent.
+"""QuestionParser Agent - 题目识别与解析.
 
-调用多模态 LLM (DeepSeek / GPT-4o / 通义VL) 解析图片中的题目，
-输出结构化的题目信息：科目、知识点、难度、题面内容。
+使用 LangChain ChatModel + 多模态能力，将图片/文本解析为结构化题目数据。
 """
 
 import logging
-import json
-import re
+from typing import Optional
+
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
 
 from app.core.llm_gateway import llm_gateway
 
 logger = logging.getLogger(__name__)
 
-# 系统提示词 - 引导多模态 LLM 输出结构化 JSON
-QUESTION_PARSE_SYSTEM_PROMPT = """你是 TuringMate 的题目识别专家，专门解析计算机考研408科目的题目图片。
 
-请仔细观察图片中的题目内容，输出以下 JSON 格式（不要输出其他任何文字）：
-{
-  "subject": "科目（必须是：数据结构、计组、操作系统、网络 之一）",
-  "knowledge_tags": ["知识点1", "知识点2"],
-  "difficulty": 难度等级（1-5的整数，1最简单5最难）,
-  "content": "完整的题目文字描述，包含所有条件和问题"
-}
+class ParsedQuestion(BaseModel):
+    """解析后的题目结构."""
+    subject: str = Field(description="科目: 数据结构/计组/操作系统/网络")
+    question_type: str = Field(description="题型: 选择/填空/解答/算法设计")
+    knowledge_tags: list[str] = Field(description="知识点标签")
+    difficulty: int = Field(description="难度等级 1-5", ge=1, le=5)
+    content: str = Field(description="题面内容（纯文本）")
+    options: Optional[list[str]] = Field(default=None, description="选择题选项")
+    answer: Optional[str] = Field(default=None, description="参考答案")
 
-判断规则：
-- subject: 根据题目涉及的核心概念判断
-- knowledge_tags: 提取2-4个关键知识点
-- difficulty: 基础概念填空=1-2, 综合应用=3, 算法设计/综合分析=4-5
-- content: 必须完整准确，不要省略条件或问题描述
-"""
+
+PARSER_SYSTEM_PROMPT = """你是计算机考研408题目解析专家。
+分析输入的内容（图片描述或文字），提取并输出结构化的 JSON 题目信息。
+
+要求：
+1. 准确识别科目和数据结构/算法相关的知识点
+2. 根据题目的综合复杂度判断难度(1-5)
+3. 保留完整的题面原文
+4. 如果无法确定某字段，用 null 或空列表"""
 
 
 class QuestionParserAgent:
-    """题目识别 Agent - 解析图片中的考题."""
+    """基于 LangChain 的题目解析 Agent."""
 
     def __init__(self):
-        self.llm = llm_gateway
+        self._llm = llm_gateway.get_chat_model()
+        self._prompt = ChatPromptTemplate.from_messages([
+            ("system", PARSER_SYSTEM_PROMPT),
+            ("human", "{input}"),
+        ])
 
-    async def parse_image(self, image_path: str | None = None, image_url: str | None = None) -> dict:
-        """解析图片中的题目.
+    async def parse_image(self, image_url: str) -> dict:
+        """从图片中解析题目（多模态）.
 
         Args:
-            image_path: 本地图片文件路径
-            image_url: 图片 URL
+            image_url: 图片 URL 或本地路径
 
         Returns:
-            结构化题目信息 dict
+            ParsedQuestion 字典
         """
-        messages = [
-            {"role": "system", "content": QUESTION_PARSE_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": "请识别这张图片中的计算机考研408题目，输出结构化JSON。",
-            },
-        ]
-
         try:
-            src = image_path or image_url
-            if not src:
-                raise ValueError("必须提供 image_path 或 image_url")
+            messages = [
+                SystemMessage(content=PARSER_SYSTEM_PROMPT),
+                HumanMessage(content="请解析这张图片中的408考研题目。"),
+            ]
+            result = await llm_gateway.chat_with_image(messages, image_url)
 
-            logger.info(f"QuestionParser: 开始识别图片 - {src}")
-
-            # 尝试多模态调用
-            raw_response = await self.llm.chat_with_image(messages, src)
-            logger.info(f"QuestionParser: LLM 多模态响应长度: {len(raw_response)}")
-
-            # 解析 JSON
-            parsed = self._extract_json(raw_response)
-
-            # 补充 question_id 和校验
-            parsed["question_id"] = f"q_{hash(parsed.get('content', '')) % 100000:05d}"
-
-            # 校验必要字段
-            if not parsed.get("content"):
-                parsed["content"] = raw_response
-
-            valid_subjects = ["数据结构", "计组", "操作系统", "网络"]
-            if parsed.get("subject") not in valid_subjects:
-                parsed["subject"] = "数据结构"  # 默认值
-
-            if not isinstance(parsed.get("difficulty"), int) or not (1 <= parsed["difficulty"] <= 5):
-                parsed["difficulty"] = 3
-
-            logger.info(f"QuestionParser: 识别成功 - {parsed['subject']}, 难度{parsed['difficulty']}")
-            return parsed
-
+            # 尝试从回复中提取 JSON
+            return self._extract_structured(result)
         except Exception as e:
-            logger.warning(f"QuestionParser: 多模态识别失败 ({e})，尝试纯文本 fallback...")
-            try:
-                fallback_messages = [
-                    {"role": "system", "content": QUESTION_PARSE_SYSTEM_PROMPT},
-                    {"role": "user", "content": "请生成一道计算机考研408数据结构科目的中等难度题目（链表相关），输出JSON格式。"},
-                ]
-                raw_response = await self.llm.chat(fallback_messages)
-                logger.info(f"QuestionParser: Fallback 成功, 响应长度: {len(raw_response)}")
+            logger.error(f"QuestionParser 图片解析失败: {e}")
+            return {"error": f"图片解析失败: {str(e)}"}
 
-                # Fallback 成功，继续走 JSON 解析流程
-                parsed = self._extract_json(raw_response)
-                parsed["question_id"] = f"q_fallback_{hash(raw_response) % 100000:05d}"
-                if not parsed.get("subject"):
-                    parsed["subject"] = "数据结构"
-                if not isinstance(parsed.get("difficulty"), int) or not (1 <= parsed.get("difficulty") <= 5):
-                    parsed["difficulty"] = 3
-                logger.info(f"QuestionParser: Fallback 解析成功 - {parsed['subject']}")
-                return parsed
+    async def parse_text(self, text: str) -> dict:
+        """从文本中解析题目.
 
-            except Exception as e2:
-                logger.error(f"QuestionParser: Fallback 也失败 - {e2}", exc_info=True)
-                return {
-                    "question_id": "q_error_001",
-                    "subject": "数据结构",
-                    "knowledge_tags": [],
-                    "difficulty": 0,
-                    "content": f"[识别失败] {str(e)}",
-                    "error": str(e),
-                }
+        Args:
+            text: 题目文本
 
-    def _extract_json(self, text: str) -> dict:
-        """从 LLM 响应中提取 JSON."""
+        Returns:
+            ParsedQuestion 字典
+        """
+        try:
+            chain = self._prompt | self._llm
+            response = await chain.ainvoke({"input": text})
+            result = response.content if hasattr(response, 'content') else str(response)
+            return self._extract_structured(result)
+        except Exception as e:
+            logger.error(f"QuestionParser 文本解析失败: {e}")
+            return {"error": f"文本解析失败: {str(e)}"}
+
+    def _extract_structured(self, raw_response: str) -> dict:
+        """从 LLM 回复中提取结构化 JSON."""
+        import json
+        import re
+
         # 尝试直接解析
-        text = text.strip()
+        try:
+            data = json.loads(raw_response.strip())
+            if "subject" in data or "content" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
 
-        # 移除可能的 markdown 代码块标记
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-
-        # 尝试找到 JSON 对象
-        json_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if json_match:
+        # 尝试提取 markdown 代码块中的 JSON
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_response)
+        if match:
             try:
-                return json.loads(json_match.group())
+                data = json.loads(match.group(1).strip())
+                return data
             except json.JSONDecodeError:
                 pass
 
-        # 如果无法解析为 JSON，包装为 content
-        logger.warning(f"QuestionParser: 无法解析JSON，原始文本前200字: {text[:200]}")
+        # 尝试找到最外层 {...}
+        brace_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', raw_response)
+        if brace_match:
+            try:
+                data = json.loads(brace_match.group(0))
+                return data
+            except json.JSONDecodeError:
+                pass
+
+        # 最终兜底：返回原始文本
         return {
-            "subject": "数据结构",
+            "subject": "未识别",
+            "question_type": "未知",
             "knowledge_tags": [],
             "difficulty": 3,
-            "content": text.strip(),
+            "content": raw_response[:1000],
         }
+
+
+# 全局单例
+question_parser_agent = QuestionParserAgent()

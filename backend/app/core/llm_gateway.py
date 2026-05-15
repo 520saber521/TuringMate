@@ -1,263 +1,148 @@
-"""LLM Gateway - 多模型统一网关.
+"""LLM Gateway - 基于 LangChain 的多模型统一网关.
 
-支持多模型可插拔切换（基于 OpenAI SDK，统一接口）:
-- deepseek: DeepSeek API (文本推理主力, 兼容 OpenAI 格式)
-- gpt-4o: OpenAI GPT-4o (视觉理解 + 文本)
-- qwen: 通义千问 VL (备选, DashScope OpenAI兼容)
+使用 langchain-openai 的 ChatOpenAI 统一接口，支持：
+- deepseek:  DeepSeek API (deepseek-chat / deepseek-reasoner)
+- openai:    OpenAI GPT-4o
+- qwen:      通义千问 (DashScope OpenAI 兼容)
 
-通过配置文件指定默认模型，运行时按场景路由：
-- 图片理解 → 多模态模型 (gpt-4o / deepseek / qwen-vl)
-- 引导推理 → 文本大模型 (deepseek-chat / gpt-4o)
+所有模型共享统一的 LangChain 接口:
+  - .invoke()       → 同步调用
+  - .ainvoke()      → 异步调用
+  - .stream()       → 同步流式
+  - .astream()      → 异步流式（用于 SSE）
+  - .bind_tools()   → 工具绑定（Agent 用途）
 """
 
-import logging
 import base64
-from abc import ABC, abstractmethod
+import logging
 from typing import AsyncIterator
 
-from openai import AsyncOpenAI
+from langchain_openai import ChatOpenAI
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-class BaseLLM(ABC):
-    """LLM 基类."""
+# ============================================================
+# 模型注册表 — 预定义的模型配置
+# ============================================================
 
-    def __init__(self, api_key: str, base_url: str, model_name: str):
-        self.api_key = api_key
-        self.base_url = base_url
-        self.model_name = model_name
-        self._client: AsyncOpenAI | None = None
-
-    @property
-    def client(self) -> AsyncOpenAI:
-        if self._client is None:
-            if not self.api_key:
-                raise ValueError(
-                    f"{self.__class__.__name__}: API_KEY 未配置，请检查 .env 文件"
-                )
-            self._client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
-        return self._client
-
-    @abstractmethod
-    async def chat(self, messages: list[dict], **kwargs) -> str:
-        """同步对话."""
-        ...
-
-    @abstractmethod
-    async def chat_with_image(self, messages: list[dict], image_url: str, **kwargs) -> str:
-        """多模态对话（图片+文本）."""
-        ...
-
-    @abstractmethod
-    async def stream_chat(self, messages: list[dict], **kwargs) -> AsyncIterator[str]:
-        """流式对话."""
-        ...
-
-
-class DeepSeekLLM(BaseLLM):
-    """DeepSeek 模型实现 - 使用 deepseek-chat / deepseek-reasoner."""
-
-    def __init__(self):
-        super().__init__(
-            api_key=settings.DEEPSEEK_API_KEY,
-            base_url=settings.DEEPSEEK_BASE_URL,
-            model_name="deepseek-chat",
-        )
-
-    async def chat(self, messages: list[dict], **kwargs) -> str:
-        model = kwargs.get("model", "deepseek-chat")
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 2048),
-        )
-        return response.choices[0].message.content or ""
-
-    async def chat_with_image(self, messages: list[dict], image_url: str, **kwargs) -> str:
-        """DeepSeek 多模态对话."""
-        content_with_image = []
-        for msg in messages[-1:]:
-            content_with_image.append({"type": "text", "text": msg["content"]})
-
-        if image_url.startswith(("http://", "https://")):
-            content_with_image.append({
-                "type": "image_url",
-                "image_url": {"url": image_url},
-            })
-        else:
-            with open(image_url, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            content_with_image.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-            })
-
-        new_messages = [
-            *messages[:-1],
-            {"role": "user", "content": content_with_image},
-        ]
-        return await self.chat(new_messages, **kwargs)
-
-    async def stream_chat(self, messages: list[dict], **kwargs) -> AsyncIterator[str]:
-        model = kwargs.get("model", "deepseek-chat")
-        stream = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 2048),
-            stream=True,
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
-
-
-class OpenAILLM(BaseLLM):
-    """OpenAI GPT-4o 模型实现."""
-
-    def __init__(self):
-        super().__init__(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
-            model_name="gpt-4o",
-        )
-
-    async def chat(self, messages: list[dict], **kwargs) -> str:
-        model = kwargs.get("model", "gpt-4o")
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 2048),
-        )
-        return response.choices[0].message.content or ""
-
-    async def chat_with_image(self, messages: list[dict], image_url: str, **kwargs) -> str:
-        """GPT-4o Vision 原生多模态."""
-        content_with_image = []
-        for msg in messages[-1:]:
-            content_with_image.append({"type": "text", "text": msg["content"]})
-
-        if image_url.startswith(("http://", "https://")):
-            content_with_image.append({
-                "type": "image_url",
-                "image_url": {"url": image_url},
-            })
-        else:
-            with open(image_url, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            content_with_image.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-            })
-
-        new_messages = [
-            *messages[:-1],
-            {"role": "user", "content": content_with_image},
-        ]
-        return await self.chat(new_messages, **kwargs)
-
-    async def stream_chat(self, messages: list[dict], **kwargs) -> AsyncIterator[str]:
-        model = kwargs.get("model", "gpt-4o")
-        stream = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 2048),
-            stream=True,
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
-
-
-class QwenLLM(BaseLLM):
-    """通义千问模型实现 - DashScope OpenAI 兼容格式."""
-
-    def __init__(self):
-        super().__init__(
-            api_key=settings.QWEN_API_KEY,
-            base_url=settings.QWEN_BASE_URL,
-            model_name="qwen-plus",
-        )
-
-    async def chat(self, messages: list[dict], **kwargs) -> str:
-        model = kwargs.get("model", "qwen-plus")
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 2048),
-        )
-        return response.choices[0].message.content or ""
-
-    async def chat_with_image(self, messages: list[dict], image_url: str, **kwargs) -> str:
-        """通义千问 VL 多模态."""
-        content_with_image = []
-        for msg in messages[-1:]:
-            content_with_image.append({"type": "text", "text": msg["content"]})
-
-        if image_url.startswith(("http://", "https://")):
-            content_with_image.append({
-                "type": "image_url",
-                "image_url": {"url": image_url},
-            })
-        else:
-            with open(image_url, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            content_with_image.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-            })
-
-        new_messages = [
-            *messages[:-1],
-            {"role": "user", "content": content_with_image},
-        ]
-        return await self.chat(new_messages, model="qwen-vl-max", **kwargs)
-
-    async def stream_chat(self, messages: list[dict], **kwargs) -> AsyncIterator[str]:
-        model = kwargs.get("model", "qwen-plus")
-        stream = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 2048),
-            stream=True,
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
+MODEL_REGISTRY: dict[str, dict] = {
+    "deepseek": {
+        "model": "deepseek-chat",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "base_url_env": "DEEPSEEK_BASE_URL",
+        "default_base_url": "https://api.deepseek.com/v1",
+    },
+    "openai": {
+        "model": "gpt-4o",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url_env": "OPENAI_BASE_URL",
+        "default_base_url": "https://api.openai.com/v1",
+    },
+    "qwen": {
+        "model": "qwen-plus",
+        "api_key_env": "QWEN_API_KEY",
+        "base_url_env": "QWEN_BASE_URL",
+        "default_base_url": "https://dashscope.aliyuncs.com/api/v1",
+    },
+}
 
 
 class LLMGateway:
-    """LLM 统一网关 - 管理多模型实例和路由."""
+    """LangChain LLM 网关.
+
+    基于 ChatOpenAI 实现多模型管理、路由和统一调用。
+    所有模型实例延迟创建，首次使用时初始化。
+    """
 
     def __init__(self):
-        self._models: dict[str, BaseLLM] = {
-            "deepseek": DeepSeekLLM(),
-            "gpt-4o": OpenAILLM(),
-            "qwen": QwenLLM(),
-        }
-        self.default_model = settings.DEFAULT_LLM_MODEL
+        self._models: dict[str, ChatOpenAI] = {}
+        self.default_model_name: str = settings.DEFAULT_LLM_MODEL or "deepseek"
 
-    def get_model(self, model: str | None = None) -> BaseLLM:
-        """获取指定模型实例."""
-        name = model or self.default_model
-        if name not in self._models:
-            raise ValueError(f"Unsupported model: {name}. Available: {list(self._models.keys())}")
-        return self._models[name]
+    # ── 核心方法：获取 LangChain ChatOpenAI 实例 ──
+
+    def get_chat_model(self, model_name: str | None = None) -> ChatOpenAI:
+        """获取指定模型的 LangChain ChatOpenAI 实例.
+
+        Args:
+            model_name: 模型名称 ("deepseek" | "openai" | "qwen")，
+                       默认使用配置中的默认模型
+
+        Returns:
+            LangChain ChatOpenAI 实例
+        """
+        name = model_name or self.default_model_name
+
+        if name not in MODEL_REGISTRY:
+            raise ValueError(
+                f"不支持的模型: {name}. 可选: {list(MODEL_REGISTRY.keys())}"
+            )
+
+        # 延迟创建：已缓存则直接返回
+        if name in self._models:
+            return self._models[name]
+
+        # 创建新的 ChatOpenAI 实例
+        config = MODEL_REGISTRY[name]
+        api_key = getattr(settings, config["api_key_env"], "")
+        base_url = getattr(settings, config["base_url_env"], "") or config["default_base_url"]
+
+        if not api_key:
+            logger.warning(
+                f"LLMGateway: {name} API Key 未配置 ({config['api_key_env']}), "
+                f"将尝试调用但可能失败"
+            )
+
+        chat_model = ChatOpenAI(
+            model=config["model"],
+            api_key=api_key,
+            base_url=base_url,
+            temperature=0.7,
+            max_tokens=2048,
+            streaming=True,  # 默认启用流式支持
+        )
+        self._models[name] = chat_model
+        logger.info(f"LLMGateway: 初始化模型 {name} ({config['model']}) @ {base_url}")
+        return chat_model
+
+    # ── 便捷调用方法 ──
 
     async def chat(self, messages: list[dict], model: str | None = None, **kwargs) -> str:
-        """对话（使用指定模型或默认模型）."""
-        llm = self.get_model(model)
-        return await llm.chat(messages, **kwargs)
+        """同步对话.
+
+        Args:
+            messages: OpenAI 格式的消息列表 [{"role": ..., "content": ...}]
+            model: 可选覆盖默认模型
+            **kwargs: 覆盖 temperature, max_tokens 等
+
+        Returns:
+            模型回复文本
+        """
+        llm = self.get_chat_model(model)
+
+        from langchain_core.messages import (
+            SystemMessage, HumanMessage, AIMessage,
+        )
+        lc_messages = []
+        for msg in messages:
+            role = msg["role"]
+            if role == "system":
+                lc_messages.append(SystemMessage(content=msg["content"]))
+            elif role == "user":
+                lc_messages.append(HumanMessage(content=msg["content"]))
+            elif role == "assistant":
+                lc_messages.append(AIMessage(content=msg["content"]))
+
+        # 构建带 kwargs 的 LLM
+        invoke_kwargs = {}
+        if "temperature" in kwargs:
+            invoke_kwargs["temperature"] = kwargs["temperature"]
+        if "max_tokens" in kwargs:
+            invoke_kwargs["max_tokens"] = kwargs["max_tokens"]
+
+        response = await llm.ainvoke(lc_messages, config={"configurable": invoke_kwargs})
+        return response.content
 
     async def chat_with_image(
         self,
@@ -266,9 +151,56 @@ class LLMGateway:
         model: str | None = None,
         **kwargs,
     ) -> str:
-        """多模态对话."""
-        llm = self.get_model(model)
-        return await llm.chat_with_image(messages, image_url, **kwargs)
+        """多模态对话 (图片 + 文本).
+
+        Args:
+            messages: 对话历史消息
+            image_url: 图片 URL 或本地文件路径
+            model: 模型名称
+        """
+        llm = self.get_chat_model(model)
+
+        from langchain_core.messages import (
+            SystemMessage, HumanMessage, AIMessage,
+        )
+        from langchain_core.messages.human import HumanMessage as HM
+
+        # 构建多模态 content
+        content_parts: list[dict | str] = []
+
+        # 最后一条 user 消息携带图片
+        for msg in messages[:-1]:
+            role = msg["role"]
+            content = msg["content"]
+            if role == "system":
+                content_parts.append(SystemMessage(content=content))
+            elif role == "user":
+                content_parts.append(HumanMessage(content=content))
+            elif role == "assistant":
+                content_parts.append(AIMessage(content=content))
+
+        # 处理图片
+        last_msg_content: list = []
+        if messages and messages[-1].get("content"):
+            last_msg_content.append({"type": "text", "text": messages[-1]["content"]})
+
+        if image_url.startswith(("http://", "https://")):
+            last_msg_content.append({
+                "type": "image_url",
+                "image_url": {"url": image_url},
+            })
+        else:
+            with open(image_url, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            last_msg_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+            })
+
+        content_parts.append(HM(content=last_msg_content))
+
+        response = await llm.ainvoke(content_parts)
+        return response.content
 
     async def stream_chat(
         self,
@@ -276,11 +208,46 @@ class LLMGateway:
         model: str | None = None,
         **kwargs,
     ) -> AsyncIterator[str]:
-        """流式对话."""
-        llm = self.get_model(model)
-        async for chunk in llm.stream_chat(messages, **kwargs):
-            yield chunk
+        """流式对话 — 用于 SSE 推送.
+
+        Yields:
+            文本 token 片段
+        """
+        llm = self.get_chat_model(model)
+
+        from langchain_core.messages import (
+            SystemMessage, HumanMessage, AIMessage,
+        )
+        lc_messages = []
+        for msg in messages:
+            role = msg["role"]
+            if role == "system":
+                lc_messages.append(SystemMessage(content=msg["content"]))
+            elif role == "user":
+                lc_messages.append(HumanMessage(content=msg["content"]))
+            elif role == "assistant":
+                lc_messages.append(AIMessage(content=msg["content"]))
+
+        async for chunk in llm.astream(lc_messages):
+            if chunk.content:
+                yield chunk.content
+
+    # ── Agent 相关 ──
+
+    def get_bindable_llm(self, model: str | None = None) -> ChatOpenAI:
+        """获取可用于 .bind_tools() 的 LLM 实例.
+
+        LangGraph Agent 需要 bind_tools 来绑定工具定义.
+        """
+        return self.get_chat_model(model)
 
 
 # 全局单例
 llm_gateway = LLMGateway()
+
+
+# ── 向后兼容：保留旧的直接访问方式 ──
+
+def get_llm(model: str | None = None) -> ChatOpenAI:
+    """获取 LangChain ChatOpenAI 实例（便捷函数）."""
+    return llm_gateway.get_chat_model(model)

@@ -10,32 +10,34 @@ uvicorn[standard]==0.34.0
 pydantic>=2.0
 pydantic-settings>=2.0
 
-# Agent Framework (LangGraph)
-langgraph>=0.2
+# ── LangChain Full Stack ──
 langchain>=0.3
 langchain-community>=0.3
+langchain-openai>=0.3        # ChatOpenAI (兼容 DeepSeek/Qwen/OpenAI)
+langchain-chroma>=0.1         # ChromaDB 向量存储
+langgraph>=0.2                # Agent 状态图编排
 
 # RAG Pipeline
 langchain-text-splitters>=0.3
-chromadb>=0.5  # 开发阶段向量存储
-pymupdf>=1.24  # PDF 解析
+chromadb>=0.5                 # 向量数据库
+pymupdf>=1.24                # PDF 解析
 
-# LLM / Embedding
-openai>=1.50  # OpenAI API 客户端（兼容多种模型）
+# Embedding Models (可选本地)
+sentence-transformers>=2.7   # HuggingFace 本地 embedding
 
 # Database
 sqlalchemy>=2.0
-pymysql>=1.1  # MySQL 驱动
-alembic>=1.14  # 数据库迁移
+pymysql>=1.1                  # MySQL 驱动
+alembic>=1.14                # 数据库迁移
 
 # Cache & Task Queue
 redis>=5.2
 celery>=5.4
 
 # Tencent Cloud Services
-cos-sdk-python>=1.9  # COS 对象存储
+cos-sdk-python>=1.9          # COS 对象存储
 
 # Utilities
-python-multipart>=0.0.18  # 文件上传
-numpy>=1.26  # 向量计算
-httpx>=0.28  # 异步 HTTP 客户端
+python-multipart>=0.0.18     # 文件上传
+numpy>=1.26                   # 向量计算
+httpx>=0.28                   # 异步 HTTP 客户端

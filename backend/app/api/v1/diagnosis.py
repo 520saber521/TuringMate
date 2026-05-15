@@ -1,11 +1,14 @@
-"""Diagnosis API - 薄弱点诊断."""
+"""Diagnosis API - 薄弱点诊断.
+
+基于 LangChain DiagnosticianAgent.
+"""
 
 import logging
 
 from fastapi import APIRouter
 
 from app.schemas.diagnosis import DiagnosisReportResponse
-from app.agents.diagnostician import diagnostician
+from app.agents.diagnostician import diagnostician_agent
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +19,18 @@ router = APIRouter()
 async def get_diagnosis_report(user_id: str = "user_001"):
     """获取薄弱点诊断报告.
 
-    Diagnostician Agent 分析用户的错题记录，
-    结合 LLM 生成四科能力雷达图和弱点列表。
+    LangChain DiagnosticianAgent 分析用户的错题记录，
+    结合知识图谱和 LLM 生成四科能力雷达图和弱点列表。
     """
     logger.info(f"Diagnosis: 生成诊断报告 - user={user_id}")
 
-    result = await diagnostician.generate_report(user_id)
+    result = await diagnostician_agent.diagnose(user_id=user_id)
 
     return DiagnosisReportResponse(
-        user_id=result.get("user_id", user_id),
-        scores=result.get("scores", {}),
+        user_id=user_id,
+        scores=result.get("radar_scores", {}),
         weak_points=result.get("weak_points", []),
-        recommendations=result.get("recommendations", []),
+        recommendations=result.get("study_plan", []),
     )
 
 
@@ -36,19 +39,19 @@ async def get_recommended_practice(user_id: str = "user_001"):
     """获取针对性练习推荐."""
     logger.info(f"Diagnosis: 获取练习推荐 - user={user_id}")
 
-    result = await diagnostician.generate_report(user_id)
+    result = await diagnostician_agent.diagnose(user_id=user_id)
 
-    # 从推荐中提取练习项
+    # 从诊断报告的 study_plan 中提取练习项
     practices = []
-    for rec in result.get("recommendations", []):
-        practices.append({
-            "id": f"p_{hash(rec.get('title', '')) % 10000:04d}",
-            "type": rec.get("type", "专项练习"),
-            "title": rec.get("title", "推荐练习"),
-            "count": rec.get("count", 5),
-        })
+    for plan in result.get("study_plan", []):
+        for task in plan.get("tasks", []):
+            practices.append({
+                "id": f"p_{hash(task) % 10000:04d}",
+                "type": "专项练习",
+                "title": task,
+                "count": 5,
+            })
 
-    # 如果推荐为空，添加默认推荐
     if not practices:
         practices = [
             {

@@ -1,168 +1,222 @@
 """Diagnostician Agent - 薄弱点诊断 Agent.
 
-分析用户的错题记录模式，
-结合 LLM 生成四科能力评估和薄弱点报告。
-MVP 阶段使用预设数据分析 + LLM 生成报告。
+使用 LangChain Chain 分析学生错题记录和学习数据，
+生成四科雷达图数据和薄弱点报告。
 """
 
 import logging
 import json
-import re
+from pathlib import Path
+from datetime import datetime, timedelta
+
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 from app.core.llm_gateway import llm_gateway
+from app.core.tools import knowledge_graph, question_search
 
 logger = logging.getLogger(__name__)
 
-DIAGNOSIS_SYSTEM_PROMPT = """你是 TuringMate 的408计算机考研诊断专家，根据学生的练习数据分析薄弱环节。
+KNOWLEDGE_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "knowledge"
 
-基于以下学生数据生成诊断报告：
 
-错题记录摘要：
-{mistake_summary}
+DIAGNOSIS_SYSTEM_PROMPT = """你是 TuringMate 的学习诊断专家。
 
-请输出 JSON 格式（不要输出其他文字）：
+基于学生的错题记录、练习历史和知识图谱，分析其薄弱环节并生成诊断报告。
+
+## 输出 JSON 格式：
 {
-  "scores": {
-    "数据结构": 分数(0-100),
-    "计组": 分数(0-100),
-    "操作系统": 分数(0-100),
-    "网络": 分数(0-100)
+  "summary": "总体评价（100字左右）",
+  "radar_scores": {
+    "数据结构": 72,
+    "计算机组成原理": 65,
+    "操作系统": 78,
+    "计算机网络": 58
   },
   "weak_points": [
     {
-      "subject": "科目名",
-      "topic": "薄弱知识点",
-      "score": 掌握度(0-100),
-      "description": "具体问题描述"
+      "subject": "科目",
+      "topic": "具体知识点",
+      "score": 45,
+      "description": "薄弱原因分析",
+      "suggestion": "改进建议"
     }
   ],
-  "recommendations": [
-    {
-      "type": "专项练习/知识点回顾/真题演练",
-      "title": "推荐标题",
-      "count": 数量
-    }
-  ]
+  "study_plan": [
+    {"week": 1, "focus": "本周重点", "tasks": ["任务1", "任务2"]}
+  ],
+  "encouragement": "鼓励话语"
 }
 
-要求：
-1. scores 反映四科整体掌握程度
-2. weak_points 列出2-4个最需要加强的知识点
-3. recommendations 给出3-5条针对性建议
-4. 分数要合理，不要全部偏高或偏低
-"""
+## 诊断原则：
+- 基于真实数据分析，不要凭空捏造
+- 分数要有区分度，体现真实差距
+- 建议要可执行、有优先级"""
 
 
 class DiagnosticianAgent:
-    """诊断 Agent - 分析错题模式，生成薄弱点报告."""
+    """基于 LangChain 的诊断 Agent."""
 
     def __init__(self):
-        self.llm = llm_gateway
+        self._llm = llm_gateway.get_chat_model()
+        self._prompt = ChatPromptTemplate.from_messages([
+            ("system", DIAGNOSIS_SYSTEM_PROMPT),
+            ("human", "{input}"),
+        ])
 
-    async def generate_report(self, user_id: str) -> dict:
-        """生成诊断报告.
+    async def diagnose(
+        self,
+        user_id: str,
+        time_range: str = "recent_30d",
+    ) -> dict:
+        """生成学习诊断报告.
 
         Args:
-            user_id: 用户 ID
+            user_id: 学生 ID
+            time_range: 时间范围 (recent_7d / recent_30d / all)
 
         Returns:
-            四科分数 + 薄弱知识点列表 + 练习推荐
+            完整诊断报告
         """
-        # TODO: 从数据库获取真实错题记录
-        # MVP 阶段使用模拟数据
-        mistake_summary = self._get_mock_mistake_summary(user_id)
+        # 1. 收集学生数据
+        student_data = await self._collect_student_data(user_id)
 
-        messages = [
-            {"role": "system", "content": DIAGNOSIS_SYSTEM_PROMPT.format(mistake_summary=mistake_summary)},
-            {"role": "user", "content": "请根据我的练习数据生成薄弱点诊断报告。"},
-        ]
+        # 2. 获取知识图谱结构作为参考
+        kg_result = await knowledge_graph.ainvoke({"action": "get_nodes"})
+        knowledge_structure = kg_result.get("nodes", [])
+
+        # 3. 用 LLM 生成诊断
+        input_text = f"""学生ID: {user_id}
+时间范围: {time_range}
+
+## 学生练习数据：
+{json.dumps(student_data, ensure_ascii=False, indent=2)}
+
+## 知识体系结构（共 {len(knowledge_structure)} 个知识点）：
+{json.dumps(knowledge_structure[:20], ensure_ascii=False, indent=2) if knowledge_structure else '暂无'}
+
+请基于以上数据生成诊断报告。"""
 
         try:
-            logger.info(f"Diagnostician: 开始生成报告 - user={user_id}")
-            raw_response = await self.llm.chat(messages, temperature=0.5)
-            logger.info(f"Diagnostician: LLM 响应长度: {len(raw_response)}")
-
-            parsed = self._extract_json(raw_response)
-
-            # 确保必要字段存在
-            parsed.setdefault("user_id", user_id)
-            parsed.setdefault("scores", {"数据结构": 70, "计组": 65, "操作系统": 75, "网络": 60})
-            parsed.setdefault("weak_points", [])
-            parsed.setdefault("recommendations", [])
-
-            # 校验 scores 包含四科
-            for subject in ["数据结构", "计组", "操作系统", "网络"]:
-                parsed["scores"].setdefault(subject, 70)
-
-            # 校验 weak_points 结构
-            for wp in parsed.get("weak_points", []):
-                wp.setdefault("subject", "数据结构")
-                wp.setdefault("topic", "未知知识点")
-                wp.setdefault("score", 50)
-                wp.setdefault("description", "需要加强练习")
-
-            # 校验 recommendations 结构
-            for rec in parsed.get("recommendations", []):
-                rec.setdefault("type", "专项练习")
-                rec.setdefault("title", "推荐练习")
-                rec.setdefault("count", 5)
-
-            return parsed
-
+            chain = self._prompt | self._llm
+            response = await chain.ainvoke({"input": input_text})
+            raw_result = response.content if hasattr(response, 'content') else str(response)
+            return self._extract_report(raw_result)
         except Exception as e:
-            logger.warning(f"Diagnostician: LLM 调用失败 ({e})，使用 fallback")
-            return self._generate_fallback_report(user_id)
+            logger.error(f"Diagnostician 诊断失败: {e}")
+            return self._generate_fallback_report(student_data)
 
-    def _get_mock_mistake_summary(self, user_id: str) -> str:
-        """获取模拟错题摘要（MVP 阶段）."""
-        return """该学生近期练习情况：
-- 数据结构：链表操作错误3次，树遍历错误2次，排序算法错误1次
-- 计组：流水线冒险判断错误4次，Cache映射错误2次
-- 操作系统：进程调度算法选择错误1次，死锁判断错误1次
-- 网络：TCP拥塞控制错误5次，IP子网划分错误3次
+    async def _collect_student_data(self, user_id: str) -> dict:
+        """收集学生数据（MVP 阶段模拟 + 真实数据接入点）."""
+        # TODO: 从数据库获取真实学生数据
+        # 当前返回模拟数据，后续替换为 DB 查询
 
-总计错题22题，正确率约68%"""
-
-    def _extract_json(self, text: str) -> dict:
-        """从 LLM 响应中提取 JSON."""
-        text = text.strip()
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-
-        json_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if json_match:
+        # 尝试从知识图谱加载真实节点信息
+        subjects_data = {}
+        for prefix, name in [("ds", "数据结构"), ("co", "计组"), ("os", "操作系统"), ("cn", "网络")]:
             try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
-                pass
+                result = await knowledge_graph.ainvoke({"action": "get_nodes", "subject": name})
+                nodes = result.get("nodes", [])
+                subjects_data[name] = [n["name"] for n in nodes if isinstance(n, dict) and "name" in n]
+            except Exception:
+                subjects_data[name] = []
 
-        logger.warning(f"Diagnostician: 无法解析JSON，原文前200字: {text[:200]}")
-        return {}
-
-    def _generate_fallback_report(self, user_id: str) -> dict:
-        """Fallback 报告."""
-        return {
-            "user_id": user_id,
-            "scores": {"数据结构": 72, "计组": 65, "操作系统": 78, "网络": 58},
-            "weak_points": [
-                {
-                    "subject": "计算机网络",
-                    "topic": "TCP拥塞控制",
-                    "score": 45,
-                    "description": "慢开始、拥塞避免、快重传的阈值变化规律掌握不牢",
-                },
-                {
-                    "subject": "计算机组成原理",
-                    "topic": "流水线冒险",
-                    "score": 52,
-                    "description": "数据冒险、控制冒险的解决策略混淆",
-                },
+        # 模拟错题数据（后续从 DB 替换）
+        mock_mistakes = {
+            "数据结构": [
+                {"topic": "链表操作", "count": 3, "last_wrong": "2026-05-10"},
+                {"topic": "二叉树遍历", "count": 2, "last_wrong": "2026-05-08"},
+                {"topic": "快速排序", "count": 1, "last_wrong": "2026-05-12"},
+                {"topic": "哈希表冲突解决", "count": 1, "last_wrong": "2026-05-13"},
             ],
-            "recommendations": [
-                {"type": "专项练习", "title": "TCP 拥塞控制专项训练", "count": 10},
-                {"type": "知识点回顾", "title": "流水线冒险机制详解", "count": 1},
+            "计组": [
+                {"topic": "浮点数表示", "count": 4, "last_wrong": "2026-05-11"},
+                {"topic": "指令流水线", "count": 2, "last_wrong": "2026-05-09"},
+                {"topic": "Cache 映射", "count": 2, "last_wrong": "2026-05-07"},
+            ],
+            "操作系统": [
+                {"topic": "进程调度算法", "count": 2, "last_wrong": "2026-05-06"},
+                {"topic": "死锁检测", "count": 1, "last_wrong": "2026-05-11"},
+                {"topic": "页面置换算法", "count": 3, "last_wrong": "2026-05-14"},
+            ],
+            "网络": [
+                {"topic": "TCP拥塞控制", "count": 5, "last_wrong": "2026-05-13"},
+                {"topic": "子网划分", "count": 3, "last_wrong": "2026-05-10"},
+                {"topic": "DNS解析过程", "count": 2, "last_wrong": "2026-05-08"},
+                {"topic": "HTTP协议", "count": 1, "last_wrong": "2026-05-12"},
             ],
         }
 
+        total_mistakes = sum(len(v) for v in mock_mistakes.values())
+        practice_days = 15  # 模拟值
 
-diagnostician = DiagnosticianAgent()
+        return {
+            "user_id": user_id,
+            "total_practices": total_mistakes + 25,  # 练习总数
+            "practice_days": practice_days,
+            "accuracy_rate": round(68.5 + hash(user_id) % 20, 1),  # 模拟正确率
+            "mistake_summary": mock_mistakes,
+            "knowledge_coverage": subjects_data,
+            "data_note": "当前为模拟数据，生产环境需接入数据库",
+        }
+
+    def _extract_report(self, raw_response: str) -> dict:
+        """提取结构化报告."""
+        import json, re
+
+        try:
+            data = json.loads(raw_response.strip())
+            if "radar_scores" in data or "weak_points" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_response)
+        if match:
+            try:
+                return json.loads(match.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+
+        return self._generate_fallback_report({})
+
+    @staticmethod
+    def _generate_fallback_report(data: dict = None) -> dict:
+        """兜底报告生成."""
+        mistakes = (data or {}).get("mistake_summary", {})
+        weak_points = []
+        for subject, items in mistakes.items():
+            for item in items:
+                count = item.get("count", 0)
+                score = max(30, 85 - count * 8)
+                weak_points.append({
+                    "subject": subject,
+                    "topic": item.get("topic", ""),
+                    "score": score,
+                    "description": f"近30天错误{count}次",
+                    "suggestion": f"建议重点复习{item.get('topic', '')}",
+                })
+
+        weak_points.sort(key=lambda x: x["score"])
+
+        return {
+            "summary": "根据近期练习情况分析，学生在部分知识点上存在明显薄弱环节。",
+            "radar_scores": {
+                "数据结构": 75,
+                "计算机组成原理": 62,
+                "操作系统": 70,
+                "计算机网络": 55,
+            },
+            "weak_points": weak_points[:6],
+            "study_plan": [
+                {"week": 1, "focus": "补强网络基础", "tasks": ["复习TCP拥塞控制", "子网划分练习"]},
+                {"week": 2, "focus": "巩固计组核心", "tasks": ["浮点数专题", "流水线习题"]},
+                {"week": 3, "focus": "综合提升", "tasks": ["跨科关联题", "真题模拟"]},
+            ],
+            "encouragement": "坚持就是胜利！每天进步一点点，408一定没问题！",
+            "is_fallback": True,
+        }
+
+
+# 全局单例
+diagnostician_agent = DiagnosticianAgent()

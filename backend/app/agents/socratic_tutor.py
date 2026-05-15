@@ -1,322 +1,123 @@
-"""SocraticTutor Agent - 苏格拉底式引导教学 Agent.
+"""SocraticTutor Agent - 基于 LangGraph 的苏格拉底教学 Agent.
 
-核心教学 Agent，通过状态机驱动引导流程：
-QUESTION → HINT → PROBE → AFFIRM → EXTEND → COMPLETE
+状态图:
+  START → [分析意图] → [RAG检索] → [LLM生成] → END
 
-每个阶段：
-1. QUESTION: 提出引导性问题，让学生先思考
-2. HINT: 学生卡住时给出提示，但不直接给答案
-3. PROBE: 追问，检验学生是否真正理解
-4. AFFIRM: 确认学生思路正确，给予正向反馈
-5. EXTEND: 拓展到相关知识点
-6. COMPLETE: 对话结束，总结关键点
+  状态流转 (TutorStage):
+    QUESTION  ──→ THINKING  ──→ GUIDANCE  ──→ PRACTICE
+       ↑                                              │
+       └──────────────── 反馈循环 ←──────────────────┘
 
-已接入 LLM Gateway，根据阶段和学生回复动态生成引导内容。
+使用 LangChain 组件:
+  - ChatOpenAI (via LLM Gateway) 对话模型
+  - @tool 装饰器的工具集
+  - ChromaDB Retriever 检索增强
 """
 
 import logging
 from enum import Enum
-from typing import AsyncIterator
+from typing import AsyncIterator, TypedDict, Annotated
+import operator
+
+from langchain_core.messages import (
+    SystemMessage, HumanMessage, AIMessage,
+    BaseMessage, remove_message, add_messages
+)
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.core.llm_gateway import llm_gateway
+from app.core.tools import question_search, knowledge_graph
 from app.rag.retriever import retriever
 
 logger = logging.getLogger(__name__)
 
-# 苏格拉底引导系统提示词
-SOCRATIC_SYSTEM_PROMPT = """你是 TuringMate 的苏格拉底式引导私教，专门辅导408计算机考研学生。
 
-你的核心原则：**永远不直接给出答案**，而是通过提问、提示和引导，让学生自己推导出结论。
+# ============================================================
+# 类型定义
+# ============================================================
 
-当前引导阶段：{stage}
-阶段说明：
-- QUESTION: 提出引导性问题，让学生先思考核心知识点
-- HINT: 学生卡住时给出方向性提示，但不暴露具体答案
-- PROBE: 追问细节，检验学生是否真正理解而非死记硬背
-- AFFIRM: 确认学生思路正确，给予正向反馈和鼓励
-- EXTEND: 拓展到相关知识点，建立知识关联
-- COMPLETE: 对话结束，总结关键要点和学习建议
+class TutorStage(str, Enum):
+    """教学阶段."""
+    QUESTION = "question"         # 题目理解阶段
+    THINKING = "thinking"         # 思考引导阶段
+    GUIDANCE = "guidance"         # 引导解答阶段
+    PRACTICE = "practice"         # 练习巩固阶段
+    REVIEW = "review"             # 复习回顾阶段
 
-题目上下文：
+
+class TutorState(TypedDict):
+    """LangGraph 状态定义."""
+    messages: Annotated[list[BaseMessage], add_messages]  # 消息历史（自动追加）
+    stage: str                                            # 当前教学阶段
+    session_id: str                                       # 会话 ID
+    question_context: dict                                # 题目上下文
+    rag_context: str                                      # RAG 检索上下文
+    is_complete: bool                                     # 是否完成
+
+
+# ============================================================
+# Prompt 模板
+# ============================================================
+
+SYSTEM_PROMPT_TEMPLATE = """你是 TuringMate 的 AI 苏格拉底私教老师，专攻计算机考研408。
+
+## 当前阶段：{stage}
+
+## 题目上下文：
 {question_context}
 
+## 参考知识（来自知识库）：
 {rag_context}
 
-回复要求：
-1. 用中文回复，语气温暖专业像学长一样
-2. 根据阶段调整引导策略
-3. 适当使用 💡 🔍 ✨ 🎯 等图标增强可读性
-4. 如果学生回答偏离主题，温和地引导回来
-5. 控制回复长度在 200 字以内
+## 阶段指令：
+{stage_instructions}
 
-{stage_instructions}"""
+## 核心原则：
+1. **永远不直接给出答案**，而是通过提问引导学生自己思考
+2. **每次只问一个问题**，等学生回答后再继续
+3. **根据学生回答质量调整引导方向**：
+   - 回答正确 → 提出更深层的问题
+   - 回答部分正确 → 指出错误部分并追问原因
+   - 回答错误 → 给提示但不直接纠正
+4. **适时鼓励**学生，保持学习动力
 
-STAGE_INSTRUCTIONS = {
-    "QUESTION": "先不评价学生回答对错，而是提出一个能让他们深入思考的问题。",
-    "HINT": "给出方向性提示，可以是类比、反例或部分信息，但不给出完整答案。",
-    "PROBE": "追问'为什么'和'什么情况下不成立'，检验理解的深度。",
-    "AFFIRM": "肯定正确的思路，指出具体好在哪里，然后引导下一步。",
-    "EXTEND": "把当前知识点联系到其他场景或科目，帮助建立知识网络。",
-    "COMPLETE": "总结本次学习的3个关键要点，给出后续练习建议。",
+请用简洁、友好的中文回复。"""
+
+STAGE_INSTRUCTIONS: dict[str, str] = {
+    "QUESTION": """帮助学生理解题目要求。
+- 先问学生：这道题让你求什么？已知条件有哪些？
+- 如果学生描述不清，帮他拆解题目要素
+- 不要急着给思路，先确保他读懂了题""",
+    "THINKING": """引导学生独立思考解题思路。
+- 问：你觉得可以用什么方法/数据结构来解决？为什么？
+- 如果学生卡住了，给一个方向性提示而非具体方法
+- 鼓励学生说出他的想法，即使不完全对""",
+    "GUIDANCE": """在学生有了初步思路后，引导他细化方案。
+- 让他说出具体的算法步骤
+- 追问边界条件、时间复杂度
+- 用反例测试他的方案是否完善""",
+    "PRACTICE": """给学生一道类似的变式题练习。
+- 题目难度应略低于原题
+- 观察学生是否能独立解决
+- 做完后一起回顾关键步骤""",
+    "REVIEW": """回顾本次对话的核心知识点。
+- 总结学到了什么
+- 点出易错点
+- 鼓励继续练习""",
 }
 
 
-class TutorStage(str, Enum):
-    """引导阶段."""
-    QUESTION = "QUESTION"
-    HINT = "HINT"
-    PROBE = "PROBE"
-    AFFIRM = "AFFIRM"
-    EXTEND = "EXTEND"
-    COMPLETE = "COMPLETE"
+# ============================================================
+# Graph Nodes (LangGraph 节点函数)
+# ============================================================
 
+async def retrieve_knowledge(state: TutorState) -> dict:
+    """节点: RAG 检索相关知识点."""
+    context = state.get("question_context", {})
+    rag_text = ""
 
-# 阶段转换提示 - 用于 LLM 判断下一阶段
-STAGE_TRANSITION_PROMPT = """根据学生的回复内容，判断应该进入哪个引导阶段。
-
-当前阶段：{current_stage}
-学生回复：{user_message}
-
-判断规则：
-- 学生回复方向正确 → 进入 AFFIRM
-- 学生回复部分正确或模糊 → 进入 HINT 给更多提示
-- 学生表示不理解 → 进入 HINT 给更具体的提示
-- 学生正确解释了原理 → 进入 PROBE 追问细节
-- 学生想继续深入学习 → 进入 EXTEND
-- 学生表示已经掌握 → 进入 COMPLETE
-
-只输出阶段名称（QUESTION/HINT/PROBE/AFFIRM/EXTEND/COMPLETE），不要输出其他内容。"""
-
-
-class SocraticTutorAgent:
-    """苏格拉底引导教学 Agent - 接入 LLM 动态生成引导内容."""
-
-    def __init__(self):
-        self._session_states: dict[str, TutorStage] = {}
-        self._session_contexts: dict[str, dict] = {}
-        self._session_histories: dict[str, list[dict]] = {}
-        self.llm = llm_gateway
-
-    def start_session(self, session_id: str, question_context: dict | None = None):
-        """初始化会话状态."""
-        self._session_states[session_id] = TutorStage.QUESTION
-        self._session_contexts[session_id] = question_context or {}
-        self._session_histories[session_id] = []
-
-    def get_stage(self, session_id: str) -> TutorStage:
-        """获取当前会话阶段."""
-        return self._session_states.get(session_id, TutorStage.QUESTION)
-
-    def set_stage(self, session_id: str, stage: TutorStage):
-        """设置当前会话阶段."""
-        self._session_states[session_id] = stage
-
-    async def generate_first_message(
-        self,
-        session_id: str,
-        question_context: dict | None = None,
-    ) -> dict:
-        """生成对话的第一条引导消息."""
-        self.start_session(session_id, question_context)
-
-        context_str = self._format_context(question_context)
-        rag_context = await self._retrieve_rag_context(question_context)
-        system_prompt = SOCRATIC_SYSTEM_PROMPT.format(
-            stage="QUESTION",
-            question_context=context_str,
-            rag_context=rag_context,
-            stage_instructions=STAGE_INSTRUCTIONS["QUESTION"],
-        )
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "我遇到了一道题，请帮我分析一下思路。"},
-        ]
-
-        try:
-            response_text = await self.llm.chat(messages)
-            self._session_histories[session_id].append({"role": "assistant", "content": response_text})
-            return {
-                "content": response_text,
-                "stage": "HINT",
-                "hint_available": True,
-            }
-        except Exception as e:
-            logger.warning(f"SocraticTutor: LLM 调用失败 ({e})，使用 fallback")
-            return {
-                "content": "同学你好！看到这道题，你觉得它考查的核心知识点是什么呢？\n\n💡 可以从题目中的关键词入手想想~",
-                "stage": "HINT",
-                "hint_available": True,
-            }
-
-    async def generate_response(
-        self,
-        session_id: str,
-        user_message: str,
-        question_context: dict | None = None,
-    ) -> dict:
-        """生成引导回复.
-
-        Args:
-            session_id: 会话 ID
-            user_message: 学生回复
-            question_context: 题目上下文
-
-        Returns:
-            AI 引导回复内容、当前阶段、是否有可用提示
-        """
-        current_stage = self.get_stage(session_id)
-
-        # 如果会话不存在，初始化
-        if session_id not in self._session_histories:
-            self.start_session(session_id, question_context)
-
-        # 记录用户消息
-        self._session_histories[session_id].append({"role": "user", "content": user_message})
-
-        context_str = self._format_context(
-            question_context or self._session_contexts.get(session_id, {})
-        )
-
-        # 1. 用 LLM 判断下一阶段
-        next_stage = await self._determine_next_stage(current_stage, user_message)
-
-        # 2. 用 LLM 生成引导回复
-        rag_context = await self._retrieve_rag_context(
-            question_context or self._session_contexts.get(session_id, {})
-        )
-        system_prompt = SOCRATIC_SYSTEM_PROMPT.format(
-            stage=next_stage.value,
-            question_context=context_str,
-            rag_context=rag_context,
-            stage_instructions=STAGE_INSTRUCTIONS.get(next_stage.value, ""),
-        )
-
-        # 构建对话历史（最近 10 条）
-        history = self._session_histories[session_id][-10:]
-        messages = [{"role": "system", "content": system_prompt}] + history
-
-        try:
-            response_text = await self.llm.chat(messages)
-            self._session_histories[session_id].append({"role": "assistant", "content": response_text})
-            self.set_stage(session_id, next_stage)
-
-            return {
-                "content": response_text,
-                "stage": next_stage.value,
-                "hint_available": next_stage in (TutorStage.HINT, TutorStage.PROBE, TutorStage.QUESTION),
-            }
-        except Exception as e:
-            logger.warning(f"SocraticTutor: LLM 调用失败 ({e})，使用 fallback")
-            fallback = self._generate_fallback(current_stage, user_message)
-            self.set_stage(session_id, TutorStage(fallback["stage"]))
-            self._session_histories[session_id].append({"role": "assistant", "content": fallback["content"]})
-            return fallback
-
-    async def stream_response(
-        self,
-        session_id: str,
-        user_message: str,
-        question_context: dict | None = None,
-    ) -> AsyncIterator[str]:
-        """流式生成引导回复."""
-        current_stage = self.get_stage(session_id)
-
-        if session_id not in self._session_histories:
-            self.start_session(session_id, question_context)
-
-        self._session_histories[session_id].append({"role": "user", "content": user_message})
-
-        context_str = self._format_context(
-            question_context or self._session_contexts.get(session_id, {})
-        )
-
-        next_stage = await self._determine_next_stage(current_stage, user_message)
-
-        rag_context = await self._retrieve_rag_context(
-            question_context or self._session_contexts.get(session_id, {})
-        )
-        system_prompt = SOCRATIC_SYSTEM_PROMPT.format(
-            stage=next_stage.value,
-            question_context=context_str,
-            rag_context=rag_context,
-            stage_instructions=STAGE_INSTRUCTIONS.get(next_stage.value, ""),
-        )
-
-        history = self._session_histories[session_id][-10:]
-        messages = [{"role": "system", "content": system_prompt}] + history
-
-        collected = []
-        try:
-            async for chunk in self.llm.stream_chat(messages):
-                collected.append(chunk)
-                yield chunk
-
-            full_response = "".join(collected)
-            self._session_histories[session_id].append({"role": "assistant", "content": full_response})
-            self.set_stage(session_id, next_stage)
-        except Exception as e:
-            logger.warning(f"SocraticTutor: 流式调用失败 ({e})，发送 fallback")
-            fallback_text = "让我们一步步来分析这道题...\n\n你觉得这道题的关键点在哪里？"
-            yield fallback_text
-
-    async def _determine_next_stage(self, current_stage: TutorStage, user_message: str) -> TutorStage:
-        """用 LLM 判断下一阶段."""
-        prompt = STAGE_TRANSITION_PROMPT.format(
-            current_stage=current_stage.value,
-            user_message=user_message,
-        )
-
-        try:
-            messages = [{"role": "user", "content": prompt}]
-            result = await self.llm.chat(messages, max_tokens=20, temperature=0.1)
-            stage_str = result.strip().upper()
-
-            # 提取有效的阶段名
-            for stage in TutorStage:
-                if stage.value in stage_str:
-                    return stage
-
-            # 默认基于简单规则
-            return self._simple_stage_transition(current_stage, user_message)
-        except Exception:
-            return self._simple_stage_transition(current_stage, user_message)
-
-    def _simple_stage_transition(self, current_stage: TutorStage, user_message: str) -> TutorStage:
-        """简单规则阶段转换（fallback）."""
-        transitions = {
-            TutorStage.QUESTION: TutorStage.HINT,
-            TutorStage.HINT: TutorStage.PROBE,
-            TutorStage.PROBE: TutorStage.AFFIRM,
-            TutorStage.AFFIRM: TutorStage.EXTEND,
-            TutorStage.EXTEND: TutorStage.COMPLETE,
-            TutorStage.COMPLETE: TutorStage.COMPLETE,
-        }
-        return transitions.get(current_stage, TutorStage.HINT)
-
-    def _format_context(self, context: dict) -> str:
-        """格式化题目上下文."""
-        if not context:
-            return "（暂无具体题目信息，请根据学生描述灵活引导）"
-
-        parts = []
-        if context.get("subject"):
-            parts.append(f"科目：{context['subject']}")
-        if context.get("knowledge_tags"):
-            parts.append(f"知识点：{', '.join(context['knowledge_tags'])}")
-        if context.get("difficulty"):
-            parts.append(f"难度：{context['difficulty']}/5")
-        if context.get("content"):
-            parts.append(f"题目：{context['content'][:300]}")
-
-        return "\n".join(parts) if parts else "（暂无具体题目信息）"
-
-    async def _retrieve_rag_context(self, context: dict) -> str:
-        """通过 RAG 检索相关知识点作为引导辅助."""
-        if not context:
-            return ""
-
-        # 构建检索查询
+    if context:
         query_parts = []
         if context.get("subject"):
             query_parts.append(context["subject"])
@@ -325,64 +126,235 @@ class SocraticTutorAgent:
         if context.get("content"):
             query_parts.append(context["content"][:100])
 
-        if not query_parts:
-            return ""
+        if query_parts:
+            try:
+                results = await retriever.retrieve(
+                    " ".join(query_parts), top_k=3
+                )
+                if results:
+                    items = [r.get("content", "") for r in results[:3]]
+                    rag_text = f"相关知识点参考：\n" + "\n".join(items) + \
+                              "\n\n请参考以上知识点辅助引导，但不要直接给出答案。"
+            except Exception as e:
+                logger.debug(f"SocraticTutor RAG 失败: {e}")
 
-        query = " ".join(query_parts)
+    return {"rag_context": rag_text}
 
-        try:
-            results = await retriever.retrieve(query, top_k=3)
-            if not results:
-                return ""
 
-            knowledge_items = []
-            for r in results[:3]:
-                content = r.get("content", "")
-                if content:
-                    knowledge_items.append(content)
+async def generate_response(state: TutorState) -> dict:
+    """节点: LLM 生成回复."""
+    llm = llm_gateway.get_chat_model()
 
-            if knowledge_items:
-                return f"相关知识点参考：\n{chr(10).join(knowledge_items)}\n\n请参考以上知识点辅助引导，但不要直接给出答案。"
-        except Exception as e:
-            logger.warning(f"SocraticTutor: RAG 检索失败 ({e})，跳过知识增强")
+    # 构建系统 prompt
+    system_content = SYSTEM_PROMPT_TEMPLATE.format(
+        stage=state.get("stage", "question"),
+        question_context=_format_context(state.get("question_context")),
+        rag_context=state.get("rag_context", "(暂无)"),
+        stage_instructions=STAGE_INSTRUCTIONS.get(state.get("stage", ""), ""),
+    )
 
-        return ""
+    messages_with_system = [
+        SystemMessage(content=system_content),
+        *state.get("messages", []),
+    ]
 
-    def _generate_fallback(self, stage: TutorStage, user_message: str) -> dict:
-        """Fallback 响应 - LLM 不可用时使用."""
-        fallbacks = {
-            TutorStage.QUESTION: {
-                "content": "同学你好！这道题涉及哪些核心概念呢？试着从题目关键词入手分析~",
-                "stage": "HINT",
-                "hint_available": True,
+    response = await llm.ainvoke(messages_with_system)
+
+    # 确定下一阶段
+    next_stage = _determine_next_stage(
+        state.get("stage", "question"),
+        state.get("messages", []),
+    )
+
+    return {
+        "messages": [response],
+        "stage": next_stage.value if isinstance(next_stage, TutorStage) else next_stage,
+    }
+
+
+def route_by_stage(state: TutorState) -> str:
+    """条件边: 根据阶段决定是否结束."""
+    stage = state.get("stage", "")
+    messages = state.get("messages", [])
+
+    # 如果已经完成足够轮次的对话
+    if len(messages) >= 15:
+        return "end"
+
+    # 如果最后一条消息是学生说"懂了"/"好了"等结束语
+    last_human = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            last_human = msg.content.strip()
+            break
+    if last_human and any(kw in last_human for kw in ["懂了", "明白了", "好了", "结束", "next"]):
+        return "end"
+
+    return "continue"
+
+
+# ============================================================
+# 辅助函数
+# ============================================================
+
+def _format_context(context: dict | None) -> str:
+    """格式化题目上下文."""
+    if not context:
+        return "（暂无具体题目信息，请根据学生描述灵活引导）"
+    parts = []
+    if context.get("subject"):
+        parts.append(f"科目：{context['subject']}")
+    if context.get("knowledge_tags"):
+        parts.append(f"知识点：{', '.join(context['knowledge_tags'])}")
+    if context.get("difficulty"):
+        parts.append(f"难度：{context['difficulty']}/5")
+    if context.get("content"):
+        parts.append(f"题目：{context['content'][:300]}")
+    return "\n".join(parts) if parts else "（暂无具体题目信息）"
+
+
+def _determine_next_stage(current_stage: str, messages: list) -> TutorStage:
+    """根据当前状态和对话内容确定下一阶段."""
+    stage_map = {
+        "question": TutorStage.THINKING,
+        "thinking": TutorStage.GUIDANCE,
+        "guidance": TutorStage.PRACTICE,
+        "practice": TutorStage.REVIEW,
+        "review": TutorStage.REVIEW,
+    }
+    return stage_map.get(current_stage, TutorStage.THINKING)
+
+
+# ============================================================
+# SocraticTutor Agent 类
+# ============================================================
+
+class SocraticTutorAgent:
+    """基于 LangGraph 的苏格拉底教学 Agent.
+
+    使用 StateGraph 编排教学流程:
+      START → retrieve_knowledge → generate_response → (route) → continue/end
+    """
+
+    def __init__(self):
+        self._graph = self._build_graph()
+
+    def _build_graph(self):
+        """构建 LangGraph 状态图."""
+        graph = StateGraph(TutorState)
+
+        # 添加节点
+        graph.add_node("retrieve", retrieve_knowledge)
+        graph.add_node("generate", generate_response)
+
+        # 添加边
+        graph.add_edge(START, "retrieve")
+        graph.add_edge("retrieve", "generate")
+
+        # 条件边: generate 之后根据阶段决定是否继续或结束
+        graph.add_conditional_edges(
+            "generate",
+            route_by_stage,
+            {
+                "continue": "retrieve",   # 继续下一轮
+                "end": END,              # 结束对话
             },
-            TutorStage.HINT: {
-                "content": "不错的思考方向！再深入想想，这个操作的边界条件是什么？",
-                "stage": "PROBE",
-                "hint_available": True,
-            },
-            TutorStage.PROBE: {
-                "content": "你能不能用自己的话说说为什么需要这样处理？",
-                "stage": "AFFIRM",
-                "hint_available": False,
-            },
-            TutorStage.AFFIRM: {
-                "content": "很好！你的理解很到位。想不想看看这个知识点还能怎么拓展？",
-                "stage": "EXTEND",
-                "hint_available": False,
-            },
-            TutorStage.EXTEND: {
-                "content": "今天的引导就到这里，总结一下我们学到的关键要点，继续保持！",
-                "stage": "COMPLETE",
-                "hint_available": False,
-            },
-            TutorStage.COMPLETE: {
-                "content": "总结完成！继续加油，有问题随时找我~",
-                "stage": "COMPLETE",
-                "hint_available": False,
-            },
+        )
+
+        # 配置检查点（支持会话记忆）
+        memory = MemorySaver()
+        return graph.compile(checkpointer=memory, interrupt_before=[])
+
+    async def generate_first_message(self, session_id: str, question_context: dict = None) -> dict:
+        """生成对话的第一条引导消息.
+
+        Args:
+            session_id: 会话唯一标识
+            question_context: 题目上下文 {"subject", "knowledge_tags", "difficulty", "content"}
+        """
+        initial_state: TutorState = {
+            "messages": [
+                HumanMessage(content="请开始引导学生理解这道题目。")
+            ],
+            "stage": TutorStage.QUESTION.value,
+            "session_id": session_id,
+            "question_context": question_context or {},
+            "rag_context": "",
+            "is_complete": False,
         }
-        return fallbacks.get(stage, fallbacks[TutorStage.QUESTION])
+
+        config = {"configurable": {"thread_id": session_id}}
+        result = await self._graph.ainvoke(initial_state, config=config)
+
+        ai_message = result["messages"][-1]
+        return {
+            "session_id": session_id,
+            "stage": result["stage"],
+            "message": ai_message.content if hasattr(ai_message, 'content') else str(ai_message),
+            "is_first": True,
+        }
+
+    async def generate_response(self, session_id: str, user_message: str, question_context: dict = None) -> dict:
+        """基于用户消息生成引导回复.
+
+        Args:
+            session_id: 会话标识
+            user_message: 用户输入
+            question_context: 题目上下文
+        """
+        config = {"configurable": {"thread_id": session_id}}
+
+        update_state: TutorState = {
+            "messages": [HumanMessage(content=user_message)],
+        }
+
+        result = await self._graph.ainvoke(update_state, config=config)
+
+        ai_message = result["messages"][-1]
+        return {
+            "session_id": session_id,
+            "stage": result["stage"],
+            "message": ai_message.content if hasattr(ai_message, 'content') else str(ai_message),
+            "is_first": False,
+        }
+
+    async def stream_response(self, session_id: str, user_message: str, question_context: dict = None) -> AsyncIterator[str]:
+        """流式输出回复 (用于 SSE).
+
+        Yields:
+            文本 token 片段
+        """
+        config = {"configurable": {"thread_id": session_id}}
+
+        update_state: TutorState = {
+            "messages": [HumanMessage(content=user_message)],
+        }
+
+        async for chunk in self._graph.astream(update_state, config=config, stream_mode="updates"):
+            for node_name, node_output in chunk.items():
+                if node_name == "generate":
+                    new_messages = node_output.get("messages", [])
+                    for msg in new_messages:
+                        if hasattr(msg, 'content') and msg.content:
+                            yield msg.content
+
+    def get_session_history(self, session_id: str) -> list[dict]:
+        """获取会话历史记录."""
+        config = {"configurable": {"thread_id": session_id}}
+        try:
+            state_snapshot = self._graph.get_state(config)
+            messages = state_snapshot.values.get("messages", [])
+            return [
+                {
+                    "role": "user" if isinstance(m, HumanMessage) else "assistant",
+                    "content": m.content if hasattr(m, 'content') else str(m),
+                    "timestamp": "",
+                }
+                for m in messages
+            ]
+        except Exception:
+            return []
 
 
-socratic_tutor = SocraticTutorAgent()
+# 全局单例
+socratic_tutor_agent = SocraticTutorAgent()

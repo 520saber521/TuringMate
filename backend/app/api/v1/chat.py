@@ -1,4 +1,7 @@
-"""Socratic guided chat API - 苏格拉底式引导对话."""
+"""Socratic guided chat API - 苏格拉底式引导对话.
+
+基于 LangGraph SocraticTutorAgent 实现。
+"""
 
 import logging
 
@@ -11,7 +14,7 @@ from app.schemas.chat import (
     ChatMessageRequest,
     ChatMessageResponse,
 )
-from app.agents.socratic_tutor import socratic_tutor
+from app.agents.socratic_tutor import socratic_tutor_agent
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,7 @@ router = APIRouter()
 async def start_guided_chat(body: ChatStartRequest):
     """开始引导对话.
 
-    初始化苏格拉底引导 Agent，创建对话会话，
+    初始化 LangGraph SocraticTutor，创建对话会话，
     返回第一条引导提问（不直接给答案）。
     """
     logger.info(f"Chat: 启动引导对话 - question_id={body.question_id}")
@@ -37,11 +40,11 @@ async def start_guided_chat(body: ChatStartRequest):
         "difficulty": 3,
     }
 
-    result = await socratic_tutor.generate_first_message(session_id, question_context)
+    result = await socratic_tutor_agent.generate_first_message(session_id, question_context)
 
     return ChatStartResponse(
         session_id=session_id,
-        first_message=result["content"],
+        first_message=result["message"],
         stage=result["stage"],
     )
 
@@ -50,21 +53,21 @@ async def start_guided_chat(body: ChatStartRequest):
 async def send_chat_message(body: ChatMessageRequest):
     """发送用户消息，获取AI引导回复.
 
-    苏格拉底 Agent 根据学生回复判断理解程度，
-    生成下一步引导（反问/提示/确认/扩展），不直接给出答案。
+    LangGraph SocraticTutor 根据学生回复判断理解程度，
+    通过状态机流转生成下一步引导。
     """
     logger.info(f"Chat: 收到消息 - session={body.session_id}, len={len(body.message)}")
 
-    result = await socratic_tutor.generate_response(
+    result = await socratic_tutor_agent.generate_response(
         session_id=body.session_id,
         user_message=body.message,
     )
 
     return ChatMessageResponse(
         session_id=body.session_id,
-        content=result["content"],
+        content=result["message"],
         stage=result["stage"],
-        hint_available=result.get("hint_available", False),
+        hint_available=True,  # LangGraph Agent 总是可提供提示
     )
 
 
@@ -72,14 +75,14 @@ async def send_chat_message(body: ChatMessageRequest):
 async def stream_chat_message(body: ChatMessageRequest):
     """流式引导对话 (SSE).
 
-    通过 SSE 流式返回 AI 引导内容，
+    通过 LangGraph astream 流式返回 AI 引导内容，
     前端逐字渲染提升交互体验。
     """
     logger.info(f"Chat: 流式对话 - session={body.session_id}")
 
     async def generate():
         try:
-            async for chunk in socratic_tutor.stream_response(
+            async for chunk in socratic_tutor_agent.stream_response(
                 session_id=body.session_id,
                 user_message=body.message,
             ):
