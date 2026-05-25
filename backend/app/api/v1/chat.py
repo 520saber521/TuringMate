@@ -1,12 +1,12 @@
 """Socratic guided chat API - 苏格拉底式引导对话.
 
-基于 LangGraph SocraticTutorAgent 实现。
+基于 LangGraph SocraticTutorAgent 实现.
+使用统一的 SSE 流式输出工具 (api.utils.create_sse_response).
 """
 
 import logging
 
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
 
 from app.schemas.chat import (
     ChatStartRequest,
@@ -15,6 +15,7 @@ from app.schemas.chat import (
     ChatMessageResponse,
 )
 from app.agents.socratic_tutor import socratic_tutor_agent
+from app.api.utils import create_sse_response
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ async def send_chat_message(body: ChatMessageRequest):
         session_id=body.session_id,
         content=result["message"],
         stage=result["stage"],
-        hint_available=True,  # LangGraph Agent 总是可提供提示
+        hint_available=True,
     )
 
 
@@ -75,28 +76,14 @@ async def send_chat_message(body: ChatMessageRequest):
 async def stream_chat_message(body: ChatMessageRequest):
     """流式引导对话 (SSE).
 
-    通过 LangGraph astream 流式返回 AI 引导内容，
-    前端逐字渲染提升交互体验。
+    使用 create_sse_response() 统一 SSE 格式和 headers，
+    通过 LangGraph astream 流式返回 AI 引导内容。
     """
     logger.info(f"Chat: 流式对话 - session={body.session_id}")
 
-    async def generate():
-        try:
-            async for chunk in socratic_tutor_agent.stream_response(
-                session_id=body.session_id,
-                user_message=body.message,
-            ):
-                yield f"data: {chunk}\n\n"
-        except Exception as e:
-            logger.error(f"Chat: 流式输出异常 - {e}")
-            yield f"data: [错误] 生成回复时出现问题，请重试\n\n"
-        yield "data: [DONE]\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
+    return create_sse_response(
+        socratic_tutor_agent.stream_response(
+            session_id=body.session_id,
+            user_message=body.message,
+        )
     )

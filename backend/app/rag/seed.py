@@ -101,22 +101,22 @@ async def seed_knowledge_base(
         logger.info(f"\n[2/4] 加载 PDF 教材: {PDFS_DIR}")
         for pdf_file in sorted(PDFS_DIR.glob("*.pdf")):
             pages = loader.load_pdf(str(pdf_file))
+            # LangChain Document 对象：设置 source metadata
             for page in pages:
-                page["metadata"]["source"] = pdf_file.name
+                page.metadata["source"] = pdf_file.name
             all_documents.extend(pages)
             stats["pdf"] += len(pages)
             logger.info(f"  ✓ {pdf_file.name}: {len(pages)} 页")
 
     elif not knowledge_only:
         logger.info(f"\n[2/4] PDF 目录不存在（跳过）: {PDFS_DIR}")
-        # 尝试查找 data 目录下的散落 PDF
         scattered_pdfs = list(BASE_DATA_DIR.glob("*.pdf"))
         if scattered_pdfs:
             logger.info(f"  发现 {len(scattered_pdfs)} 个散落 PDF:")
             for pdf in scattered_pdfs:
                 pages = loader.load_pdf(str(pdf))
                 for page in pages:
-                    page["metadata"]["source"] = pdf.name
+                    page.metadata["source"] = pdf.name
                 all_documents.extend(pages)
                 stats["pdf"] += len(pages)
                 logger.info(f"  ✓ {pdf.name}: {len(pages)} 页")
@@ -147,11 +147,20 @@ async def seed_knowledge_base(
     logger.info(f"\n[4/{'3' if knowledge_only else '4'}] 文本切分 (策略={strategy})...")
     t_split = time.time()
 
-    splitter = SmartSplitter(
-        strategy=strategy,
-        similarity_threshold=threshold,
-    )
-    chunks = splitter.split_documents(all_documents)
+    # 将 LangChain Document 转为 splitter 兼容的 dict 格式
+    from langchain_core.documents import Document
+    docs_for_splitting = []
+    for doc in all_documents:
+        if isinstance(doc, Document):
+            docs_for_splitting.append({
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+            })
+        else:
+            docs_for_splitting.append(doc)
+
+    splitter = SmartSplitter(strategy=strategy)
+    chunks = splitter.split_documents(docs_for_splitting)
 
     split_time = time.time() - t_split
     rule_count = sum(1 for c in chunks if c.get("metadata", {}).get("splitter") == "rule")

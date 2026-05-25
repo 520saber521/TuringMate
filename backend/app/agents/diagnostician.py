@@ -1,52 +1,64 @@
 """Diagnostician Agent - 薄弱点诊断 Agent.
 
-使用 LangChain Chain 分析学生错题记录和学习数据，
+使用 LangChain + with_structured_output() 分析学生错题记录和学习数据，
 生成四科雷达图数据和薄弱点报告。
 """
 
-import logging
 import json
+import logging
 from pathlib import Path
-from datetime import datetime, timedelta
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
 
 from app.core.llm_gateway import llm_gateway
-from app.core.tools import knowledge_graph, question_search
+from app.core.tools import knowledge_graph
 
 logger = logging.getLogger(__name__)
 
 KNOWLEDGE_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "knowledge"
 
 
+# ── Pydantic 输出模型 ────────────────────────────────────────────
+
+
+class RadarScores(BaseModel):
+    """四科雷达图分数."""
+    数据结构: int = Field(description="数据结构得分 0-100")
+    计算机组成原理: int = Field(description="计算机组成原理得分 0-100")
+    操作系统: int = Field(description="操作系统得分 0-100")
+    计算机网络: int = Field(description="计算机网络得分 0-100")
+
+
+class WeakPointDetail(BaseModel):
+    """薄弱点详情."""
+    subject: str = Field(description="科目")
+    topic: str = Field(description="具体知识点")
+    score: int = Field(description="掌握程度分 (0-100)")
+    description: str = Field(description="薄弱原因分析")
+    suggestion: str = Field(description="改进建议")
+
+
+class StudyPlanWeek(BaseModel):
+    """学习计划周."""
+    week: int = Field(description="第几周")
+    focus: str = Field(description="本周重点")
+    tasks: list[str] = Field(description="任务列表")
+
+
+class DiagnosisReport(BaseModel):
+    """完整诊断报告."""
+    summary: str = Field(description="总体评价（100字左右）")
+    radar_scores: RadarScores = Field(description="四科雷达分数")
+    weak_points: list[WeakPointDetail] = Field(default_factory=list, description="薄弱环节")
+    study_plan: list[StudyPlanWeek] = Field(default_factory=list, description="学习计划")
+    encouragement: str = Field(default="", description="鼓励话语")
+
+
 DIAGNOSIS_SYSTEM_PROMPT = """你是 TuringMate 的学习诊断专家。
 
 基于学生的错题记录、练习历史和知识图谱，分析其薄弱环节并生成诊断报告。
-
-## 输出 JSON 格式：
-{
-  "summary": "总体评价（100字左右）",
-  "radar_scores": {
-    "数据结构": 72,
-    "计算机组成原理": 65,
-    "操作系统": 78,
-    "计算机网络": 58
-  },
-  "weak_points": [
-    {
-      "subject": "科目",
-      "topic": "具体知识点",
-      "score": 45,
-      "description": "薄弱原因分析",
-      "suggestion": "改进建议"
-    }
-  ],
-  "study_plan": [
-    {"week": 1, "focus": "本周重点", "tasks": ["任务1", "任务2"]}
-  ],
-  "encouragement": "鼓励话语"
-}
 
 ## 诊断原则：
 - 基于真实数据分析，不要凭空捏造
@@ -55,10 +67,12 @@ DIAGNOSIS_SYSTEM_PROMPT = """你是 TuringMate 的学习诊断专家。
 
 
 class DiagnosticianAgent:
-    """基于 LangChain 的诊断 Agent."""
+    """基于 LangChain + Structured Output 的诊断 Agent."""
 
     def __init__(self):
         self._llm = llm_gateway.get_chat_model()
+        # 结构化 LLM — 自动输出 DiagnosisReport
+        self._structured_llm = self._llm.with_structured_output(DiagnosisReport)
         self._prompt = ChatPromptTemplate.from_messages([
             ("system", DIAGNOSIS_SYSTEM_PROMPT),
             ("human", "{input}"),
@@ -76,7 +90,7 @@ class DiagnosticianAgent:
             time_range: 时间范围 (recent_7d / recent_30d / all)
 
         Returns:
-            完整诊断报告
+            完整诊断报告字典
         """
         # 1. 收集学生数据
         student_data = await self._collect_student_data(user_id)
@@ -85,7 +99,7 @@ class DiagnosticianAgent:
         kg_result = await knowledge_graph.ainvoke({"action": "get_nodes"})
         knowledge_structure = kg_result.get("nodes", [])
 
-        # 3. 用 LLM 生成诊断
+        # 3. 构建输入
         input_text = f"""学生ID: {user_id}
 时间范围: {time_range}
 
@@ -98,20 +112,15 @@ class DiagnosticianAgent:
 请基于以上数据生成诊断报告。"""
 
         try:
-            chain = self._prompt | self._llm
-            response = await chain.ainvoke({"input": input_text})
-            raw_result = response.content if hasattr(response, 'content') else str(response)
-            return self._extract_report(raw_result)
+            chain = self._prompt | self._structured_llm
+            report: DiagnosisReport = await chain.ainvoke({"input": input_text})
+            return report.model_dump()
         except Exception as e:
             logger.error(f"Diagnostician 诊断失败: {e}")
             return self._generate_fallback_report(student_data)
 
     async def _collect_student_data(self, user_id: str) -> dict:
         """收集学生数据（MVP 阶段模拟 + 真实数据接入点）."""
-        # TODO: 从数据库获取真实学生数据
-        # 当前返回模拟数据，后续替换为 DB 查询
-
-        # 尝试从知识图谱加载真实节点信息
         subjects_data = {}
         for prefix, name in [("ds", "数据结构"), ("co", "计组"), ("os", "操作系统"), ("cn", "网络")]:
             try:
@@ -121,7 +130,6 @@ class DiagnosticianAgent:
             except Exception:
                 subjects_data[name] = []
 
-        # 模拟错题数据（后续从 DB 替换）
         mock_mistakes = {
             "数据结构": [
                 {"topic": "链表操作", "count": 3, "last_wrong": "2026-05-10"},
@@ -148,37 +156,16 @@ class DiagnosticianAgent:
         }
 
         total_mistakes = sum(len(v) for v in mock_mistakes.values())
-        practice_days = 15  # 模拟值
 
         return {
             "user_id": user_id,
-            "total_practices": total_mistakes + 25,  # 练习总数
-            "practice_days": practice_days,
-            "accuracy_rate": round(68.5 + hash(user_id) % 20, 1),  # 模拟正确率
+            "total_practices": total_mistakes + 25,
+            "practice_days": 15,
+            "accuracy_rate": round(68.5 + hash(user_id) % 20, 1),
             "mistake_summary": mock_mistakes,
             "knowledge_coverage": subjects_data,
             "data_note": "当前为模拟数据，生产环境需接入数据库",
         }
-
-    def _extract_report(self, raw_response: str) -> dict:
-        """提取结构化报告."""
-        import json, re
-
-        try:
-            data = json.loads(raw_response.strip())
-            if "radar_scores" in data or "weak_points" in data:
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_response)
-        if match:
-            try:
-                return json.loads(match.group(1).strip())
-            except json.JSONDecodeError:
-                pass
-
-        return self._generate_fallback_report({})
 
     @staticmethod
     def _generate_fallback_report(data: dict = None) -> dict:

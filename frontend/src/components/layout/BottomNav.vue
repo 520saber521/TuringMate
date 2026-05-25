@@ -3,9 +3,9 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Home,
-  Camera,
+  Search,
   MessageCircle,
-  PenTool,
+  User,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -13,9 +13,9 @@ const router = useRouter()
 
 const navItems = [
   { path: '/', icon: Home, label: '首页' },
-  { path: '/chat/demo', icon: MessageCircle, label: '对话' },
-  { path: '/photo-search', icon: Camera, label: '搜题' },
-  { path: '/correction', icon: PenTool, label: '批改' },
+  { path: '/photo-search', icon: Search, label: '搜题' },
+  { path: '/chat/demo', icon: MessageCircle, label: '问AI' },
+  { path: '/diagnosis', icon: User, label: '我的' },
 ]
 
 const activePath = computed(() => {
@@ -30,8 +30,9 @@ function navigate(path: string) {
 </script>
 
 <template>
+  <!-- Mobile only: h-14(56px) + safe-area ≈ 72px = pb-18 in AppLayout -->
   <nav class="bottom-nav fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-    <div class="nav-inner flex items-center justify-around py-1 px-2 safe-area-bottom">
+    <div class="nav-inner flex items-center justify-around h-14 py-1 px-2 safe-area-bottom">
       <button
         v-for="item in navItems"
         :key="item.path"
@@ -71,14 +72,14 @@ function navigate(path: string) {
 
 <style scoped>
 .nav-inner {
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid rgba(108, 92, 231, 0.06);
+  border-top: 1px solid var(--color-border);
 }
 
 .safe-area-bottom {
-  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 /* Active tab subtle background glow */

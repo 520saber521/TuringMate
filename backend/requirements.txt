@@ -34,8 +34,8 @@ alembic>=1.14                # 数据库迁移
 redis>=5.2
 celery>=5.4
 
-# Tencent Cloud Services
-cos-sdk-python>=1.9          # COS 对象存储
+# Tencent Cloud Services (本地开发可暂时注释)
+# cos-sdk-python>=1.9          # COS 对象存储
 
 # Utilities
 python-multipart>=0.0.18     # 文件上传

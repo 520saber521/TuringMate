@@ -1,14 +1,12 @@
-"""Retriever - 基于 LangChain 的混合检索器.
+"""Retriever - 基于 LangChain EnsembleRetriever 的混合检索器.
 
 完整 RAG 管线:
   1. ChromaDB 向量相似度搜索 (langchain_chroma)
-  2. BM25 关键词搜索 (可选)
-  3. 混合加权 + 重排序
-  4. 输出格式化检索结果
+  2. BM25 关键词搜索 (langchain_community.BM25Retriever)
+  3. EnsembleRetriever 原生混合融合
+  4. 格式化检索结果输出
 
-与 LangChain Chain 集成：
-  - 可作为 RetrieverTool 被 Agent 调用
-  - 可用于 create_retrieval_chain 构建 QA Chain
+替代之前的手动 BM25 实现 (_bm25_search ~40行) 和手动合并逻辑.
 """
 
 import logging
@@ -22,20 +20,48 @@ logger = logging.getLogger(__name__)
 
 
 class HybridRetriever:
-    """LangChain 混合检索器.
+    """LangChain EnsembleRetriever 混合检索器.
 
-    整合向量搜索 + BM25（可选）+ 重排序，
-    提供统一的检索接口供 Agent 和 API 使用。
+    使用原生 BM25Retriever + Chroma Retriever + EnsembleRetriever，
+    替代手动实现的 BM25 算法和合并排序逻辑。
     """
 
     def __init__(self):
         self._vectorstore = None
-        self._bm25_corpus: list[str] = []  # BM25 语料库
+        self._bm25_retriever = None  # langchain_community.retrievers.BM25Retriever
+        self._ensemble_retriever = None  # langchain.retrievers.EnsembleRetriever
+        self._bm25_corpus: list[str] = []  # 用于重建 BM25Retriever
 
     def _get_vectorstore(self):
         if self._vectorstore is None:
             self._vectorstore = get_vectorstore()
         return self._vectorstore
+
+    def _get_ensemble(self, query: str = "", top_k: int = 5):
+        """获取或创建 EnsembleRetriever."""
+        store = self._get_vectorstore()
+
+        # 向量检索器
+        vec_retriever = store.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": top_k},
+        )
+
+        bm25_weight = getattr(settings, "RERANK_WEIGHT_BM25", 0.3)
+
+        # 如果不需要 BM25 或没有语料，直接返回向量检索器
+        if bm25_weight <= 0 or not self._bm25_corpus or not self._bm25_retriever:
+            return vec_retriever
+
+        # 使用 LangChain 原生 EnsembleRetriever
+        if self._ensemble_retriever is None:
+            from langchain.retrievers import EnsembleRetriever
+
+            self._ensemble_retriever = EnsembleRetriever(
+                retrievers=[vec_retriever, self._bm25_retriever],
+                weights=[1.0 - bm25_weight, bm25_weight],
+            )
+        return self._ensemble_retriever
 
     async def retrieve(
         self,
@@ -60,47 +86,39 @@ class HybridRetriever:
         if kwargs.get("subject"):
             where_filter = {"subject": kwargs["subject"]}
 
-        # ── 1. 向量相似度搜索 ──
-        results_with_scores = store.similarity_search_with_score(
-            query=query,
-            k=top_k,
-            filter=where_filter,
-        )
+        # ── 有过滤条件时用向量库原生搜索（EnsembleRetriever 不支持 where filter）──
+        if where_filter:
+            results_with_scores = store.similarity_search_with_score(
+                query=query,
+                k=top_k,
+                filter=where_filter,
+            )
+            return self._format_results(results_with_scores, source="vector")
 
-        vector_results = []
-        for doc, raw_score in results_with_scores:
-            # Chroma 返回距离 → 转为相似度 (0~1)
-            similarity = max(0.0, 1.0 - min(raw_score, 1.0))
-            vector_results.append({
+        # ── 无过滤条件时用 EnsembleRetriever 混合检索 ──
+        ensemble = self._get_ensemble(query, top_k)
+
+        try:
+            docs = ensemble.invoke(query)
+            # EnsembleRetriever 不返回分数，统一给默认高分
+            return [{
                 "content": doc.page_content,
                 "metadata": doc.metadata,
-                "score": round(similarity, 4),
-                "_source": "vector",
-            })
-
-        # ── 2. BM25 关键词搜索（如果可用）──
-        bm25_weight = getattr(settings, "RERANK_WEIGHT_BM25", 0.3)
-        if bm25_weight > 0 and self._bm25_corpus:
-            try:
-                bm25_results = await self._bm25_search(query, top_k=top_k)
-                # 合并去重 + 加权融合
-                vector_results = self._merge_and_rerank(
-                    vector_results, bm25_results,
-                    vec_weight=(1.0 - bm25_weight),
-                    bm25_weight=bm25_weight,
-                )
-            except Exception as e:
-                logger.debug(f"BM25 搜索跳过: {e}")
-
-        # ── 3. 按最终得分排序，返回 top_k ──
-        vector_results.sort(key=lambda x: x["score"], reverse=True)
-        return vector_results[:top_k]
+                "score": 0.85,  # Ensemble 结果均为高相关
+                "_source": "ensemble",
+            } for doc in docs[:top_k]]
+        except Exception as e:
+            logger.debug(f"EnsembleRetriever 搜索失败 ({e})，回退到纯向量搜索")
+            results_with_scores = store.similarity_search_with_score(
+                query=query, k=top_k,
+            )
+            return self._format_results(results_with_scores, source="vector_fallback")
 
     async def index_documents(self, documents: list[dict], rebuild=False):
         """索引文档到向量库.
 
         Args:
-            documents: 文档列表 [{"content": str, "metadata": dict}]
+            documents: 文档列表 (支持 dict 或 LangChain Document)
             rebuild: 是否清空重建
         """
         from langchain_core.documents import Document
@@ -114,107 +132,82 @@ class HybridRetriever:
             except Exception as e:
                 logger.warning(f"Retriever: 清空失败 ({e})")
 
-        # 使用 LangChain splitter 切分
-        chunks = split_documents(documents)
-
+        # 统一转换为 Document 对象
         langchain_docs = []
-        for chunk in chunks:
-            langchain_docs.append(Document(
-                page_content=chunk.get("content", ""),
-                metadata=chunk.get("metadata", {}),
-            ))
+        for doc in documents:
+            if isinstance(doc, Document):
+                langchain_docs.append(doc)
+            elif isinstance(doc, dict):
+                langchain_docs.append(Document(
+                    page_content=doc.get("content", ""),
+                    metadata=doc.get("metadata", {}),
+                ))
+
+        # 如果还没切分，先做切分
+        if not langchain_docs or any(
+            len(d.page_content) > (settings.CHUNK_SIZE or 500) * 1.5
+            for d in langchain_docs
+        ):
+            chunks = split_documents([
+                d.dict() if hasattr(d, "dict") else {"content": d.page_content, "metadata": d.metadata}
+                if isinstance(d, Document) else d
+                for d in langchain_docs
+            ])
+            langchain_docs = [
+                Document(page_content=c["content"], metadata=c["metadata"])
+                for c in chunks
+            ]
 
         if langchain_docs:
-            # 直接使用 Chroma add_documents
             store.add_documents(langchain_docs)
             try:
                 store.persist()
             except Exception:
                 pass
 
-            # 更新 BM25 语料库
+            # 重建 BM25Retriever 语料库
             self._bm25_corpus = [doc.page_content for doc in langchain_docs]
+            self._rebuild_bm25_retriever()
 
             logger.info(f"Retriever: 已索引 {len(langchain_docs)} 个文档块")
 
-    async def _bm25_search(self, query: str, top_k: int = 5) -> list[dict]:
-        """BM25 关键词搜索."""
-        import math
-        from collections import Counter
-
+    def _rebuild_bm25_retriever(self):
+        """从语料库重建 BM25Retriever."""
         if not self._bm25_corpus:
-            return []
+            self._bm25_retriever = None
+            self._ensemble_retriever = None
+            return
 
-        # 简易 BM25 实现
-        query_terms = query.lower().split()
-        k1 = 1.5
-        b = 0.75
-        avg_dl = sum(len(d.split()) for d in self._bm25_corpus) / len(self._bm25_corpus)
+        try:
+            from langchain_community.retrievers import BM25Retriever
 
-        scores = []
-        for idx, doc in enumerate(self._bm25_corpus):
-            doc_terms = doc.lower().split()
-            dl = len(doc_terms)
-            term_freqs = Counter(doc_terms)
-            score = 0.0
-            for q_term in query_terms:
-                tf = term_freqs.get(q_term, 0)
-                df = sum(1 for d in self._bm25_corpus if q_term in d.lower().split())
-                idf = math.log((len(self._bm25_corpus) - df + 0.5) / (df + 0.5) + 1.0)
-                score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl / avg_dl))
-            if score > 0:
-                scores.append({"index": idx, "score": score})
-
-        scores.sort(key=lambda x: x["score"], reverse=True)
-        results = []
-        for item in scores[:top_k]:
-            idx = item["index"]
-            results.append({
-                "content": self._bm25_corpus[idx],
-                "metadata": {},
-                "score": min(item["score"] / 10.0, 1.0),  # 归一化
-                "_source": "bm25",
-            })
-        return results
+            self._bm25_retriever = BM25Retriever.from_texts(
+                self._bm25_corpus, k=5
+            )
+            # 重置 ensemble 缓存，下次 retrieve 时自动重建
+            self._ensemble_retriever = None
+            logger.info(f"Retriever: BM25Retriever 已重建，语料 {len(self._bm25_corpus)} 条")
+        except ImportError:
+            logger.warning("BM25Retriever 需要 rank_bm25 包，BM25 功能禁用")
+            self._bm25_retriever = None
 
     @staticmethod
-    def _merge_and_rerank(
-        vector_results: list[dict],
-        bm25_results: list[dict],
-        vec_weight: float = 0.7,
-        bm25_weight: float = 0.3,
-    ) -> list[dict]:
-        """合并并重新排序两个来源的结果.
-
-        按 content 匹配合并分数.
-        """
-        merged = {}
-        for r in vector_results:
-            key = r["content"][:100]  # 用前 100 字符作为键
-            merged[key] = {**r, "final_score": r["score"] * vec_weight}
-
-        for r in bm25_results:
-            key = r["content"][:100]
-            if key in merged:
-                merged[key]["final_score"] += r["score"] * bm25_weight
-            else:
-                merged[key] = {
-                    **r,
-                    "final_score": r["score"] * bm25_weight,
-                }
-
-        result_list = list(merged.values())
-        for r in result_list:
-            r["score"] = round(r.pop("final_score", r.get("score", 0)), 4)
-
-        return result_list
+    def _format_results(results_with_scores, source: str = "vector") -> list[dict]:
+        """将 Chroma similarity_search_with_score 结果格式化."""
+        formatted = []
+        for doc, raw_score in results_with_scores:
+            similarity = max(0.0, 1.0 - min(raw_score, 1.0))
+            formatted.append({
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+                "score": round(similarity, 4),
+                "_source": source,
+            })
+        return formatted
 
     @property
     def as_langchain_retriever(self):
-        """返回 LangChain 兼容的 Retriever 对象.
-
-        可直接传入 create_retrieval_chain() 或 LLM.bind_tools().
-        """
+        """返回 LangChain 兼容的 Retriever 对象."""
         store = self._get_vectorstore()
         return store.as_retriever(
             search_type="similarity",

@@ -1,19 +1,22 @@
 """QuestionParser Agent - 题目识别与解析.
 
-使用 LangChain ChatModel + 多模态能力，将图片/文本解析为结构化题目数据。
+使用 LangChain ChatModel + with_structured_output(),
+将图片/文本解析为结构化题目数据 (ParsedQuestion).
 """
 
 import logging
 from typing import Optional
 
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from app.core.llm_gateway import llm_gateway
 
 logger = logging.getLogger(__name__)
+
+
+# ── Pydantic 输出模型 (用于 with_structured_output) ──────────────
 
 
 class ParsedQuestion(BaseModel):
@@ -28,7 +31,7 @@ class ParsedQuestion(BaseModel):
 
 
 PARSER_SYSTEM_PROMPT = """你是计算机考研408题目解析专家。
-分析输入的内容（图片描述或文字），提取并输出结构化的 JSON 题目信息。
+分析输入的内容（图片描述或文字），提取并输出结构化的题目信息。
 
 要求：
 1. 准确识别科目和数据结构/算法相关的知识点
@@ -38,10 +41,12 @@ PARSER_SYSTEM_PROMPT = """你是计算机考研408题目解析专家。
 
 
 class QuestionParserAgent:
-    """基于 LangChain 的题目解析 Agent."""
+    """基于 LangChain + Structured Output 的题目解析 Agent."""
 
     def __init__(self):
         self._llm = llm_gateway.get_chat_model()
+        # 使用 with_structured_output 绑定 Pydantic 模型，LLM 自动输出结构化 JSON
+        self._structured_llm = self._llm.with_structured_output(ParsedQuestion)
         self._prompt = ChatPromptTemplate.from_messages([
             ("system", PARSER_SYSTEM_PROMPT),
             ("human", "{input}"),
@@ -63,8 +68,9 @@ class QuestionParserAgent:
             ]
             result = await llm_gateway.chat_with_image(messages, image_url)
 
-            # 尝试从回复中提取 JSON
-            return self._extract_structured(result)
+            # 多模态调用返回原始文本，用 structured_llm 解析
+            parsed: ParsedQuestion = await self._structured_llm.ainvoke(result)
+            return parsed.model_dump()
         except Exception as e:
             logger.error(f"QuestionParser 图片解析失败: {e}")
             return {"error": f"图片解析失败: {str(e)}"}
@@ -79,53 +85,12 @@ class QuestionParserAgent:
             ParsedQuestion 字典
         """
         try:
-            chain = self._prompt | self._llm
-            response = await chain.ainvoke({"input": text})
-            result = response.content if hasattr(response, 'content') else str(response)
-            return self._extract_structured(result)
+            chain = self._prompt | self._structured_llm
+            parsed: ParsedQuestion = await chain.ainvoke({"input": text})
+            return parsed.model_dump()
         except Exception as e:
             logger.error(f"QuestionParser 文本解析失败: {e}")
             return {"error": f"文本解析失败: {str(e)}"}
-
-    def _extract_structured(self, raw_response: str) -> dict:
-        """从 LLM 回复中提取结构化 JSON."""
-        import json
-        import re
-
-        # 尝试直接解析
-        try:
-            data = json.loads(raw_response.strip())
-            if "subject" in data or "content" in data:
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试提取 markdown 代码块中的 JSON
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_response)
-        if match:
-            try:
-                data = json.loads(match.group(1).strip())
-                return data
-            except json.JSONDecodeError:
-                pass
-
-        # 尝试找到最外层 {...}
-        brace_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', raw_response)
-        if brace_match:
-            try:
-                data = json.loads(brace_match.group(0))
-                return data
-            except json.JSONDecodeError:
-                pass
-
-        # 最终兜底：返回原始文本
-        return {
-            "subject": "未识别",
-            "question_type": "未知",
-            "knowledge_tags": [],
-            "difficulty": 3,
-            "content": raw_response[:1000],
-        }
 
 
 # 全局单例

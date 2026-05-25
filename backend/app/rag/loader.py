@@ -1,98 +1,86 @@
-"""Document Loader - 文档加载.
+"""Document Loader - 基于 LangChain Document Loaders.
 
-支持 408 教材 PDF (PyMuPDF)、历年真题解析、结构化知识点数据。
+使用 langchain_community 原生加载器：
+  - PyMuPDFLoader: PDF 教材加载（直接返回 List[Document]）
+  - JSONLoader: 真题/知识点 JSON 加载
+  - DirectoryLoader: 目录批量加载
+
+所有方法统一返回 List[Document]，消除全链路的 dict→Document 转换开销。
 """
 
 import logging
 from pathlib import Path
+from typing import Optional
+
+from langchain_community.document_loaders import (
+    DirectoryLoader,
+    JSONLoader,
+    PyMuPDFLoader,
+)
+from langchain_core.documents import Document
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class DocumentLoader:
-    """文档加载器 - 支持 PDF 和 JSON 知识点加载."""
+    """LangChain 文档加载器封装."""
 
-    def load_pdf(self, pdf_path: str) -> list[dict]:
-        """加载 PDF 文档.
+    def load_pdf(self, pdf_path: str) -> list[Document]:
+        """加载 PDF 文档 (PyMuPDFLoader).
 
         Args:
             pdf_path: PDF 文件路径
 
         Returns:
-            文档页面列表 [{"page": int, "content": str, "metadata": dict}]
+            LangChain Document 列表
         """
         try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(pdf_path)
-            pages = []
-            for i, page in enumerate(doc):
-                text = page.get_text()
-                if text.strip():
-                    pages.append({
-                        "page": i + 1,
-                        "content": text.strip(),
-                        "metadata": {"source": pdf_path, "page": i + 1},
-                    })
-            logger.info(f"DocumentLoader: 加载 PDF {pdf_path}, 共 {len(pages)} 页")
-            return pages
-        except ImportError:
-            logger.warning("DocumentLoader: PyMuPDF 未安装，无法解析 PDF")
-            return []
+            loader = PyMuPDFLoader(pdf_path)
+            docs = loader.load()
+            logger.info(f"DocumentLoader: 加载 PDF {pdf_path}, 共 {len(docs)} 页")
+            return docs
         except Exception as e:
             logger.error(f"DocumentLoader: 加载 PDF 失败 - {e}")
             return []
 
-    def load_exam(self, exam_path: str) -> list[dict]:
-        """加载真题数据 (JSON 格式).
+    def load_exam(self, exam_path: str) -> list[Document]:
+        """加载真题数据 (JSONLoader).
 
         Args:
             exam_path: 真题 JSON 文件路径
 
         Returns:
-            题目文档列表
+            LangChain Document 列表
         """
-        import json
-
         try:
-            path = Path(exam_path)
-            if not path.exists():
-                logger.warning(f"DocumentLoader: 真题文件不存在 - {exam_path}")
-                return []
+            loader = JSONLoader(
+                file_path=exam_path,
+                jq_schema=".[] | {content, subject, year, difficulty}",
+                text_content=False,
+            )
+            docs = loader.load()
 
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            # 补充 source metadata
+            for doc in docs:
+                doc.metadata["source"] = exam_path
 
-            if isinstance(data, list):
-                return [
-                    {
-                        "page": i + 1,
-                        "content": item.get("content", ""),
-                        "metadata": {
-                            "source": exam_path,
-                            "subject": item.get("subject", ""),
-                            "year": item.get("year", ""),
-                            "difficulty": item.get("difficulty", 3),
-                        },
-                    }
-                    for i, item in enumerate(data)
-                    if item.get("content")
-                ]
-            return []
+            logger.info(f"DocumentLoader: 加载真题 {exam_path}, 共 {len(docs)} 条")
+            return docs
         except Exception as e:
-            logger.error(f"DocumentLoader: 加载真题失败 - {e}")
-            return []
+            logger.warning(f"DocumentLoader: JSONLoader 加载失败 ({e})，回退到手动解析")
+            return self._load_json_fallback(exam_path)
 
-    def load_knowledge(self, knowledge_dir: str) -> list[dict]:
-        """加载结构化知识节点.
+    def load_knowledge(self, knowledge_dir: str) -> list[Document]:
+        """加载知识节点目录 (DirectoryLoader + JSON).
 
         Args:
             knowledge_dir: 知识点 JSON 目录
 
         Returns:
-            知识点文档列表
+            LangChain Document 列表
         """
-        import json
-
         docs = []
         knowledge_path = Path(knowledge_dir)
 
@@ -100,48 +88,37 @@ class DocumentLoader:
             logger.warning(f"DocumentLoader: 知识目录不存在 - {knowledge_dir}")
             return docs
 
-        for json_file in knowledge_path.glob("*.json"):
+        for json_file in sorted(knowledge_path.glob("*.json")):
             try:
-                with open(json_file, "r", encoding="utf-8") as f:
-                    nodes = json.load(f)
-
-                if isinstance(nodes, list):
-                    for node in nodes:
-                        # 将知识节点转为文档
-                        content_parts = [f"知识点：{node.get('name', '')}"]
-
-                        if node.get("prerequisites"):
-                            prereq_names = node.get("prerequisites", [])
-                            content_parts.append(f"前置知识：{', '.join(prereq_names)}")
-
-                        if node.get("related"):
-                            related_names = node.get("related", [])
-                            content_parts.append(f"关联知识：{', '.join(related_names)}")
-
-                        docs.append({
-                            "page": 0,
-                            "content": "\n".join(content_parts),
-                            "metadata": {
-                                "source": json_file.name,
-                                "subject": node.get("subject", ""),
-                                "node_id": node.get("id", ""),
-                            },
-                        })
+                loader = JSONLoader(
+                    file_path=str(json_file),
+                    jq_schema=".[] | {id, name, subject, prerequisites, related, description}",
+                    text_content=False,
+                )
+                file_docs = loader.load()
+                # 为每个 document 添加来源标记
+                for doc in file_docs:
+                    doc.metadata["_source_file"] = json_file.name
+                docs.extend(file_docs)
             except Exception as e:
-                logger.error(f"DocumentLoader: 加载知识点文件失败 - {json_file}: {e}")
+                logger.warning(f"DocumentLoader: 加载 {json_file} 失败 - {e}")
 
         logger.info(f"DocumentLoader: 从 {knowledge_dir} 加载 {len(docs)} 个知识点")
         return docs
 
-    def load_directory(self, dir_path: str, extensions: list[str] | None = None) -> list[dict]:
-        """加载目录下所有文档.
+    def load_directory(
+        self,
+        dir_path: str,
+        extensions: Optional[list[str]] = None,
+    ) -> list[Document]:
+        """加载目录下所有文档 (DirectoryLoader).
 
         Args:
             dir_path: 目录路径
             extensions: 支持的文件扩展名
 
         Returns:
-            所有文档列表
+            所有 Document 列表
         """
         path = Path(dir_path)
         if not path.exists():
@@ -149,18 +126,58 @@ class DocumentLoader:
             return []
 
         ext_set = set(extensions or [".pdf", ".json"])
-        all_docs = []
+        all_docs: list[Document] = []
 
-        for file_path in path.rglob("*"):
-            if file_path.suffix.lower() in ext_set:
-                if file_path.suffix == ".pdf":
-                    all_docs.extend(self.load_pdf(str(file_path)))
-                elif file_path.suffix == ".json":
-                    # JSON 文件可能是知识点或真题
-                    all_docs.extend(self.load_knowledge(str(file_path.parent)))
-                    break  # 避免重复加载
+        # 加载 PDF
+        if ".pdf" in ext_set:
+            try:
+                pdf_loader = DirectoryLoader(
+                    path, glob="**/*.pdf", loader_cls=PyMuPDFLoader
+                )
+                all_docs.extend(pdf_loader.load())
+            except Exception as e:
+                logger.debug(f"DirectoryLoader PDF 加载跳过: {e}")
 
+        # 加载 JSON (知识点/真题)
+        if ".json" in ext_set:
+            json_files = list(path.rglob("*.json"))
+            for jf in json_files:
+                all_docs.extend(self._load_json_fallback(str(jf)))
+
+        logger.info(f"DocumentLoader: 从目录 {dir_path} 加载 {len(all_docs)} 个文档")
         return all_docs
+
+    @staticmethod
+    def _load_json_fallback(json_path: str) -> list[Document]:
+        """JSONLoader 不可用时的手动回退."""
+        import json
+
+        docs = []
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            items = data if isinstance(data, list) else [data]
+            for i, item in enumerate(items):
+                if isinstance(item, dict):
+                    content_parts = []
+                    for key in ("content", "description", "name"):
+                        if item.get(key):
+                            content_parts.append(f"{key}: {item[key]}")
+
+                    if content_parts:
+                        docs.append(Document(
+                            page_content="\n".join(content_parts),
+                            metadata={
+                                "source": json_path,
+                                "index": i,
+                                **{k: v for k, v in item.items() if k not in ("content", "description", "name")},
+                            },
+                        ))
+        except Exception as e:
+            logger.debug(f"JSON fallback 失败 {json_path}: {e}")
+
+        return docs
 
 
 loader = DocumentLoader()

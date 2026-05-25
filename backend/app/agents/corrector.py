@@ -1,7 +1,7 @@
 """Corrector Agent - 手写批改 Agent.
 
-使用 LangChain 多模态能力分析学生草稿纸/手写答案，
-给出逐步骤的评分和反馈。
+使用 LangChain + with_structured_output() 结构化输出,
+分析学生草稿纸/手写答案，给出逐步骤的评分和反馈。
 """
 
 import logging
@@ -9,47 +9,59 @@ from typing import Optional
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
 
 from app.core.llm_gateway import llm_gateway
-from app.core.tools import image_ocr
 
 logger = logging.getLogger(__name__)
 
 
+# ── Pydantic 输出模型 ────────────────────────────────────────────
+
+
+class CorrectionStep(BaseModel):
+    """批改步骤."""
+    step_no: int = Field(description="步骤编号")
+    description: str = Field(description="步骤描述")
+    is_correct: bool = Field(description="是否正确")
+    score: int = Field(description="该步骤得分")
+    feedback: str = Field(description="点评")
+
+
+class WeakPoint(BaseModel):
+    """薄弱点."""
+    topic: str = Field(description="知识点")
+    score: int = Field(description="掌握程度分 (0-100)")
+
+
+class CorrectionResult(BaseModel):
+    """结构化批改结果."""
+    total_score: int = Field(description="总分")
+    max_score: int = Field(default=100, description="满分")
+    steps: list[CorrectionStep] = Field(default_factory=list, description="各步骤评分")
+    summary: str = Field(default="", description="总体评价")
+    suggestions: list[str] = Field(default_factory=list, description="改进建议")
+    weak_points: list[WeakPoint] = Field(default_factory=list, description="薄弱环节")
+
+
 CORRECTION_SYSTEM_PROMPT = """你是计算机考研408的专业批改老师。
 
-请仔细分析学生手写的解题过程，按以下格式输出批改结果：
+请仔细分析学生手写的解题过程，输出结构化的批改结果。
 
 ## 批改要求：
 1. **逐步骤评分**：每个关键步骤给分（满分根据步骤数分配）
 2. **标注错误**：明确指出哪一步错了、错在哪、正确做法是什么
 3. **总体评价**：总结主要问题点和优点
-4. **改进建议**：针对薄弱点给出具体学习方向
-
-## 输出 JSON 格式：
-{
-  "total_score": 85,
-  "max_score": 100,
-  "steps": [
-    {
-      "step_no": 1,
-      "description": "步骤描述",
-      "is_correct": true/false,
-      "score": 10,
-      "feedback": "点评"
-    }
-  ],
-  "summary": "总体评价",
-  "suggestions": ["建议1", "建议2"],
-  "weak_points": [{"topic": "知识点", "score": 70}]
-}"""
+4. **改进建议**：针对薄弱点给出具体学习方向"""
 
 
 class CorrectorAgent:
-    """基于 LangChain 的批改 Agent."""
+    """基于 LangChain + Structured Output 的批改 Agent."""
 
     def __init__(self):
         self._llm = llm_gateway.get_chat_model()
+        # 结构化 LLM — 自动解析 JSON 输出为 CorrectionResult
+        self._structured_llm = self._llm.with_structured_output(CorrectionResult)
         self._prompt = ChatPromptTemplate.from_messages([
             ("system", CORRECTION_SYSTEM_PROMPT),
             ("human", [
@@ -70,13 +82,10 @@ class CorrectorAgent:
             question_info: 题目信息 {"content", "subject", "answer"}
 
         Returns:
-            批改结果 {"total_score", "steps", "summary", ...}
+            批改结果字典
         """
         try:
-            # 使用多模态 LLM 分析图片
-            messages = [
-                SystemMessage(content=CORRECTION_SYSTEM_PROMPT),
-            ]
+            messages = [SystemMessage(content=CORRECTION_SYSTEM_PROMPT)]
 
             q_text = ""
             if question_info:
@@ -92,32 +101,14 @@ class CorrectorAgent:
             messages.append(HumanMessage(content=f"{q_text}\n\n请批改下面学生的手写答案（图片）。"))
 
             result = await llm_gateway.chat_with_image(messages, image_url)
-            return self._extract_correction(result)
+
+            # 用 structured LLM 解析多模态返回文本
+            parsed: CorrectionResult = await self._structured_llm.ainvoke(result)
+            return parsed.model_dump()
 
         except Exception as e:
             logger.error(f"Corrector 批改失败: {e}")
             return self._fallback_result(str(e))
-
-    def _extract_correction(self, raw_response: str) -> dict:
-        """从 LLM 回复中提取结构化批改结果."""
-        import json, re
-
-        try:
-            data = json.loads(raw_response.strip())
-            if "total_score" in data or "steps" in data:
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        # 提取 markdown JSON
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_response)
-        if match:
-            try:
-                return json.loads(match.group(1).strip())
-            except json.JSONDecodeError:
-                pass
-
-        return self._fallback_result(raw_response[:500])
 
     @staticmethod
     def _fallback_result(error_msg: str = "") -> dict:

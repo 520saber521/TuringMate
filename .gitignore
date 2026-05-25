@@ -23,6 +23,7 @@ backend/.env
 # IDE
 .vscode/
 .idea/
+.codebuddy/
 *.swp
 *.swo
 .DS_Store
@@ -39,6 +40,9 @@ data/uploads/*.jpeg
 # OS
 Thumbs.db
 Desktop.ini
+
+# Temp files
+query
 
 # Logs
 *.log

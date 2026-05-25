@@ -9,6 +9,13 @@ const router = createRouter({
       component: () => import('@/views/HomeView.vue'),
     },
     {
+      // 文字提问入口（从首页搜索框跳转）
+      path: '/chat/ask',
+      name: 'ask',
+      component: () => import('@/views/GuidedChatView.vue'),
+      props: (route) => ({ query: route.query.q }),
+    },
+    {
       path: '/photo-search',
       name: 'photo-search',
       component: () => import('@/views/PhotoSearchView.vue'),

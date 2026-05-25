@@ -1,6 +1,7 @@
 """Diagnosis API - 薄弱点诊断.
 
 基于 LangChain DiagnosticianAgent.
+使用统一工具 (api.utils.format_agent_result).
 """
 
 import logging
@@ -9,6 +10,7 @@ from fastapi import APIRouter
 
 from app.schemas.diagnosis import DiagnosisReportResponse
 from app.agents.diagnostician import diagnostician_agent
+from app.api.utils import format_agent_result
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,8 @@ async def get_diagnosis_report(user_id: str = "user_001"):
     """
     logger.info(f"Diagnosis: 生成诊断报告 - user={user_id}")
 
-    result = await diagnostician_agent.diagnose(user_id=user_id)
+    raw_result = await diagnostician_agent.diagnose(user_id=user_id)
+    result = format_agent_result(raw_result)
 
     return DiagnosisReportResponse(
         user_id=user_id,
@@ -39,9 +42,9 @@ async def get_recommended_practice(user_id: str = "user_001"):
     """获取针对性练习推荐."""
     logger.info(f"Diagnosis: 获取练习推荐 - user={user_id}")
 
-    result = await diagnostician_agent.diagnose(user_id=user_id)
+    raw_result = await diagnostician_agent.diagnose(user_id=user_id)
+    result = format_agent_result(raw_result)
 
-    # 从诊断报告的 study_plan 中提取练习项
     practices = []
     for plan in result.get("study_plan", []):
         for task in plan.get("tasks", []):
@@ -54,15 +57,7 @@ async def get_recommended_practice(user_id: str = "user_001"):
 
     if not practices:
         practices = [
-            {
-                "id": "p_default_001",
-                "type": "专项练习",
-                "title": "基础知识巩固练习",
-                "count": 10,
-            },
+            {"id": "p_default_001", "type": "专项练习", "title": "基础知识巩固练习", "count": 10},
         ]
 
-    return {
-        "user_id": user_id,
-        "practices": practices,
-    }
+    return {"user_id": user_id, "practices": practices}

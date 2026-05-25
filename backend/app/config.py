@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     RERANK_WEIGHT_VECTOR: float = 0.7
     RERANK_WEIGHT_BM25: float = 0.3
 
+    # LangGraph Checkpointer 后端 (M6: memory / postgres / redis)
+    CHECKPOINT_BACKEND: str = "memory"
+
     # COS (Tencent Cloud Object Storage)
     COS_SECRET_ID: str = ""
     COS_SECRET_KEY: str = ""

@@ -1,26 +1,41 @@
-"""TuringMate Core - LangChain 核心模块.
+"""TuringMate Core - LLM Gateway + Tools + Prompts.
 
-基于 LangChain 全栈重构:
-  - llm_gateway:  ChatOpenAI 多模型网关
-  - tools:        @tool 工具集 (image_ocr, question_search, code_executor, knowledge_graph)
+模块:
+  - llm_gateway:   LangChain ChatOpenAI 多模型网关 (DeepSeek/OpenAI/Qwen)
+  - tools:         @tool 装饰器的工具集 (image_ocr/question_search/code_executor/knowledge_graph)
+  - prompts:       集中式 Prompt 模板管理 (ChatPromptTemplate 注册表)
 """
 
-from app.core.llm_gateway import llm_gateway, LLMGateway, get_llm
+from app.core.llm_gateway import llm_gateway, get_llm
 from app.core.tools import (
     ALL_TOOLS,
     TOOL_NAMES,
-    langchain_tools,
     image_ocr,
     question_search,
     code_executor,
     knowledge_graph,
 )
+from app.core.prompts import (
+    PromptRegistry,
+    STAGE_INSTRUCTIONS,
+    get_prompt,
+    list_prompts,
+)
 
 __all__ = [
+    # LLM Gateway
     "llm_gateway",
-    "LLMGateway",
     "get_llm",
+    # Tools
     "ALL_TOOLS",
     "TOOL_NAMES",
-    "langchain_tools",
+    "image_ocr",
+    "question_search",
+    "code_executor",
+    "knowledge_graph",
+    # Prompts
+    "PromptRegistry",
+    "STAGE_INSTRUCTIONS",
+    "get_prompt",
+    "list_prompts",
 ]

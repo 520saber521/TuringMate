@@ -1,6 +1,7 @@
 """Question parsing API - 图片/文本题目识别.
 
 基于 LangChain QuestionParserAgent + 多模态 LLM.
+使用统一工具 (api.utils.format_agent_result).
 """
 import os
 import uuid
@@ -9,6 +10,7 @@ import tempfile
 from fastapi import APIRouter, UploadFile, File
 from app.schemas.question import QuestionParseResponse
 from app.agents.question_parser import question_parser_agent
+from app.api.utils import format_agent_result
 
 router = APIRouter()
 
@@ -19,14 +21,7 @@ async def parse_question_image(image: UploadFile = File(...)):
 
     LangChain QuestionParserAgent 调用多模态 LLM 解析图片中的题目。
     返回结构化的题目信息：科目、知识点、难度、题面内容等。
-
-    流程：
-    1. 接收前端上传的图片文件
-    2. 保存到临时目录
-    3. 调用 QuestionParserAgent.parse_image()
-    4. 返回结构化结果
     """
-
     ext = os.path.splitext(image.filename or "upload.jpg")[1] or ".jpg"
     filename = f"{uuid.uuid4().hex}{ext}"
     temp_dir = tempfile.gettempdir()
@@ -37,7 +32,8 @@ async def parse_question_image(image: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(content)
 
-        result = await question_parser_agent.parse_image(image_url=file_path)
+        raw_result = await question_parser_agent.parse_image(image_url=file_path)
+        result = format_agent_result(raw_result)
 
         return QuestionParseResponse(
             question_id=result.get("question_id") or f"q_{uuid.uuid4().hex[:8]}",

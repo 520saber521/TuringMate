@@ -1,6 +1,7 @@
 """Handwriting correction API - 手写批改.
 
 基于 LangChain CorrectorAgent + 多模态 LLM.
+使用统一工具 (api.utils.format_agent_result / safe_parse_json).
 """
 
 import logging
@@ -12,6 +13,7 @@ from fastapi import APIRouter, UploadFile, File
 
 from app.schemas.correction import CorrectionAnalyzeResponse
 from app.agents.corrector import corrector_agent
+from app.api.utils import format_agent_result
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,6 @@ async def analyze_handwriting(
     """
     logger.info(f"Correction: 收到批改请求 - filename={image.filename}")
 
-    # 保存临时文件
     ext = os.path.splitext(image.filename or "upload.jpg")[1] or ".jpg"
     filename = f"{uuid.uuid4().hex}{ext}"
     temp_dir = tempfile.gettempdir()
@@ -41,12 +42,12 @@ async def analyze_handwriting(
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # 调用 Corrector Agent (LangChain)
         result = await corrector_agent.correct(
             image_url=file_path,
             question_info={"id": question_id} if question_id else None,
         )
 
+        result = format_agent_result(result)
         steps = result.get("steps", [])
         formatted_steps = [
             {

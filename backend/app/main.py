@@ -1,9 +1,13 @@
-"""TuringMate Backend - FastAPI Application Entry Point."""
+"""TuringMate Backend - FastAPI Application Entry Point.
 
-from fastapi import FastAPI
+包含全局异常处理器注册和 CORS 配置.
+"""
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.api.utils import api_exception_handler, APIError
 
 
 def create_app() -> FastAPI:
@@ -16,7 +20,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # CORS 配置
+    # ── CORS 配置 ──
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -25,7 +29,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # 注册路由
+    # ── L2: 全局异常处理器 ──
+    # 统一捕获所有未处理异常，返回规范 JSON 错误响应
+    # 业务异常抛出 APIError / AgentError / RAGError 自动映射到对应 HTTP 状态码
+    app.add_exception_handler(APIError, api_exception_handler)
+    app.add_exception_handler(Exception, api_exception_handler)
+
+    # ── 注册路由 ──
     from app.api.v1 import router as v1_router
     app.include_router(v1_router, prefix="/api/v1")
 
