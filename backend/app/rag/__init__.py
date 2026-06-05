@@ -16,7 +16,7 @@ from app.rag.splitter import (
     split_documents,
     split_text,
 )
-from app.rag.embeddings import create_embeddings, get_embeddings, embeddings
+from app.rag.embeddings import create_embeddings, get_embeddings
 from app.rag.vectorstore import vectorstore
 from app.rag.retriever import retriever
 

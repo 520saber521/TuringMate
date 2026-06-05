@@ -50,3 +50,16 @@ def reset_vectorstore():
     """重置向量存储单例（用于测试或重建场景）."""
     global _store
     _store = None
+
+
+# 懒加载 — 避免模块导入时触发 embeddings 初始化（langchain_openai 导入需 ~22s）
+_vectorstore_compat = None
+
+
+def __getattr__(name):
+    global _vectorstore_compat
+    if name == "vectorstore":
+        if _vectorstore_compat is None:
+            _vectorstore_compat = get_vectorstore()
+        return _vectorstore_compat
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

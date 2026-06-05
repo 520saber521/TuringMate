@@ -20,10 +20,12 @@ import {
   Play,
   TrendingUp,
   Star,
+  Binary,
+  Cpu,
+  Monitor,
+  Globe,
+  Quote,
 } from 'lucide-vue-next'
-import Card from '@/components/ui/Card.vue'
-import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
 
 const router = useRouter()
 
@@ -80,10 +82,10 @@ const askMethods = [
 ]
 
 const subjects = [
-  { name: '数据结构', icon: '🌲', color: '#6366F1', bg: 'rgba(99,102,241,0.08)', count: 128, hot: true, progress: 65 },
-  { name: '计组', icon: '⚙️', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', count: 96, hot: false, progress: 42 },
-  { name: '操作系统', icon: '💻', color: '#10B981', bg: 'rgba(16,185,129,0.08)', count: 84, hot: true, progress: 78 },
-  { name: '网络', icon: '🌐', color: '#F43F5E', bg: 'rgba(244,63,94,0.08)', count: 72, hot: false, progress: 30 },
+  { name: '数据结构', icon: Binary, color: '#7c3aed', bg: 'rgba(99,102,241,0.08)', count: 128, hot: true, progress: 65 },
+  { name: '计组', icon: Cpu, color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', count: 96, hot: false, progress: 42 },
+  { name: '操作系统', icon: Monitor, color: '#10B981', bg: 'rgba(16,185,129,0.08)', count: 84, hot: true, progress: 78 },
+  { name: '网络', icon: Globe, color: '#F43F5E', bg: 'rgba(244,63,94,0.08)', count: 72, hot: false, progress: 30 },
 ]
 
 function goToSubject(subjectName: string) {
@@ -98,7 +100,7 @@ const recentQuestions = [
     question: '快速排序的时间复杂度为什么最坏是 O(n²)？',
     subject: '数据结构',
     accent: 'from-indigo-500 to-violet-500',
-    accentColor: '#6366F1',
+    accentColor: '#7c3aed',
     time: '10分钟前',
     replies: 3,
   },
@@ -140,14 +142,14 @@ const aiPowers = [
     title: '苏格拉底引导',
     desc: '不给答案，引导你自己想通',
     icon: Brain,
-    color: '#6366F1',
+    color: '#7c3aed',
     gradient: 'from-indigo-500 via-violet-500 to-purple-500',
     size: 'large' as const,
     path: '/chat/demo',
   },
   {
     title: '举一反三',
-    desc: '一道题变出N道变体，举一反三',
+    desc: '一道题变出N道变体',
     icon: Repeat,
     color: '#0EA5E9',
     gradient: 'from-cyan-500 via-sky-500 to-blue-500',
@@ -158,14 +160,14 @@ const aiPowers = [
     title: '思维回放',
     desc: '可视化你的解题思考链路',
     icon: Eye,
-    color: '#8B5CF6',
+    color: '#a78bfa',
     gradient: 'from-violet-500 via-purple-500 to-fuchsia-500',
     size: 'small' as const,
     path: '/diagnosis',
   },
   {
     title: 'AI 研友',
-    desc: '虚拟学习伙伴陪你讨论问题，互帮互助',
+    desc: '虚拟学习伙伴陪你讨论',
     icon: Users,
     color: '#10B981',
     gradient: 'from-emerald-500 via-green-500 to-teal-500',
@@ -174,7 +176,7 @@ const aiPowers = [
   },
   {
     title: '情绪感知',
-    desc: '懂你心情的智能导师，适时调整教学节奏',
+    desc: '懂你心情的智能导师',
     icon: Heart,
     color: '#EC4899',
     gradient: 'from-pink-500 via-rose-500 to-red-500',
@@ -204,11 +206,10 @@ const todayStats = computed(() => ({
 const hotQuestions = [
   { q: '红黑树和AVL树怎么选？', tag: '高频', color: '#F43F5E' },
   { q: '虚拟内存的页面置换算法', tag: '考点', color: '#F59E0B' },
-  { q: '死锁的四个必要条件', tag: '经典', color: '#6366F1' },
+  { q: '死锁的四个必要条件', tag: '经典', color: '#7c3aed' },
   { q: 'HTTP和HTTPS的区别', tag: '必考', color: '#10B981' },
 ]
 
-// Entrance animation trigger
 const mounted = ref(false)
 onMounted(() => {
   requestAnimationFrame(() => {
@@ -216,7 +217,6 @@ onMounted(() => {
   })
 })
 
-// Magnetic hover effect
 function onMagneticMove(e: MouseEvent, el: HTMLElement) {
   const rect = el.getBoundingClientRect()
   const x = e.clientX - rect.left - rect.width / 2
@@ -231,7 +231,7 @@ function onMagneticLeave(el: HTMLElement) {
 
 <template>
   <div class="home-view" :class="{ 'is-mounted': mounted }">
-    <!-- ====== Floating Particles Background ====== -->
+    <!-- ====== Floating Particles ====== -->
     <div class="floating-particles" aria-hidden="true">
       <div class="particle p1"></div>
       <div class="particle p2"></div>
@@ -242,65 +242,40 @@ function onMagneticLeave(el: HTMLElement) {
     </div>
 
     <!-- ====== Hero Section ====== -->
-    <section class="hero-section mb-8 stagger-item">
-      <div class="hero-card">
-        <!-- Multi-color glow blobs -->
+    <section class="hero-section stagger-item">
+      <div class="hero-grid">
         <div class="glow-blob blob-1"></div>
         <div class="glow-blob blob-2"></div>
         <div class="glow-blob blob-3"></div>
-
-        <div class="hero-content">
-          <!-- Status row -->
-          <div class="flex items-center gap-3 mb-5 flex-wrap">
-            <div class="status-badge status-badge--ai">
-              <Sparkles :size="14" class="sparkle-icon" />
-              <span>AI 智能解题助手 v2.0</span>
-            </div>
-            <span class="countdown-badge">
-              <span class="countdown-dot"></span>
-              距考研 218 天
-            </span>
-          </div>
-
-          <!-- Title -->
-          <h1 class="hero-title">
-            遇到不会的
-            <span class="gradient-text gradient-text--fire">难题</span>
-            ？
-          </h1>
-          <p class="hero-subtitle">
-            拍照、输入、描述 — 三种方式，AI 导师帮你彻底搞懂
+        <div class="hero-text">
+          <p class="eyebrow">
+            <Sparkles :size="13" class="eyebrow-icon sparkle-icon" />
+            AI 智能解题助手
+            <span class="eyebrow-sep">·</span>
+            距考研 218 天
           </p>
-
-          <!-- Search Box -->
-          <div
-            class="search-box"
-            :class="{ 'is-focused': searchFocused }"
-            @click="searchFocused = true"
-          >
+          <h1 class="hero-title">
+            遇到不会的<span class="gradient-text">难题</span>？
+          </h1>
+          <p class="hero-lede">
+            拍照、输入、描述 — AI 导师帮你彻底搞懂
+          </p>
+          <div class="search-box" :class="{ 'is-focused': searchFocused }" @click="searchFocused = true">
             <div class="search-box__inner">
-              <div class="search-icon-wrap">
-                <Camera :size="20" class="search-icon" />
-              </div>
               <input
                 id="main-search-input"
                 v-model="searchQuery"
                 type="text"
-                placeholder="输入你想问的问题..."
+                placeholder="输入你的问题..."
                 class="search-input"
                 @keydown="handleKeydown"
                 @focus="searchFocused = true"
                 @blur="searchFocused = false"
               />
-              <button
-                class="search-submit-btn"
-                @mousedown.prevent="handleSearch"
-              >
+              <button class="search-submit-btn" @mousedown.prevent="handleSearch">
                 <ArrowRight :size="18" />
-                <span class="search-submit-ripple"></span>
               </button>
             </div>
-            <!-- Hot Tags -->
             <div class="hot-tags-row">
               <TrendingUp :size="13" class="hot-tags-icon" />
               <button
@@ -316,111 +291,90 @@ function onMagneticLeave(el: HTMLElement) {
             </div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- ====== Feature Banner: Asymmetric Layout ====== -->
-    <section class="feature-banner mb-8 stagger-item">
-      <div class="feature-banner__grid">
-        <!-- Left: large stat card -->
-        <div
-          class="feature-stat-card magnetic-card"
-          @mousemove="(e) => onMagneticMove(e, ($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
-          @mouseleave="(e) => onMagneticLeave(($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
-        >
-          <div class="feature-stat-card__glow"></div>
-          <div class="feature-stat-card__content">
-            <div class="feature-stat-card__icon">
-              <BarChart3 :size="22" />
-            </div>
-            <div class="feature-stat-card__value">
-              <span class="feature-stat-card__number">{{ todayStats.questionsAsked }}</span>
-              <span class="feature-stat-card__unit">题</span>
-            </div>
-            <p class="feature-stat-card__label">今日提问</p>
-            <div class="feature-stat-card__progress">
-              <div class="feature-stat-card__bar" :style="{ width: '65%' }"></div>
-            </div>
-            <p class="feature-stat-card__sub">连续学习 <strong>{{ todayStats.streakDays }}</strong> 天 🔥</p>
-          </div>
-        </div>
-
-        <!-- Right top: concept mastery -->
-        <div
-          class="feature-mini-card magnetic-card"
-          @mousemove="(e) => onMagneticMove(e, ($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
-          @mouseleave="(e) => onMagneticLeave(($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
-        >
-          <div class="feature-mini-card__icon feature-mini-card__icon--green">
-            <Star :size="16" />
-          </div>
-          <div>
-            <p class="feature-mini-card__value">{{ todayStats.conceptsLearned }}</p>
-            <p class="feature-mini-card__label">今日掌握概念</p>
-          </div>
-        </div>
-
-        <!-- Right bottom: accuracy -->
-        <div
-          class="feature-mini-card magnetic-card"
-          @mousemove="(e) => onMagneticMove(e, ($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
-          @mouseleave="(e) => onMagneticLeave(($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
-        >
-          <div class="feature-mini-card__icon feature-mini-card__icon--blue">
-            <Target :size="16" />
-          </div>
-          <div>
-            <p class="feature-mini-card__value feature-mini-card__value--green">+{{ todayStats.accuracy }}%</p>
-            <p class="feature-mini-card__label">答题正确率</p>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hv-ring hv-ring--1"></div>
+          <div class="hv-ring hv-ring--2"></div>
+          <div class="hv-ring hv-ring--3"></div>
+          <div class="hv-dot hv-dot--1"></div>
+          <div class="hv-dot hv-dot--2"></div>
+          <div class="hv-dot hv-dot--3"></div>
+          <div class="hv-dot hv-dot--4"></div>
+          <div class="hv-dot hv-dot--5"></div>
+          <div class="hv-dot hv-dot--6"></div>
+          <div class="hv-center">
+            <Brain :size="32" class="hv-center-icon" />
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ====== Quick Actions: Staggered 2-col Grid ====== -->
-    <section class="mb-8 stagger-item">
-      <div class="section-header">
-        <div>
-          <h3 class="section-title">开始学习</h3>
-          <p class="section-desc">选择最适合你的提问方式</p>
+    <!-- ====== Stats Row ====== -->
+    <section class="section-spaced stagger-item">
+      <p class="eyebrow">今日概览</p>
+      <h2 class="section-title">学习动态</h2>
+      <div class="stats-row">
+        <div
+          class="stat-card magnetic-card"
+          @mousemove="(e) => onMagneticMove(e, ($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
+          @mouseleave="(e) => onMagneticLeave(($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
+        >
+          <p class="stat-card__value">{{ todayStats.questionsAsked }}<small> 题</small></p>
+          <p class="stat-card__label">今日提问</p>
+          <div class="stat-card__bar"><div class="stat-card__bar-fill" style="width:65%"></div></div>
+          <p class="stat-card__sub">连续 <strong>{{ todayStats.streakDays }}</strong> 天</p>
+        </div>
+        <div
+          class="stat-card magnetic-card"
+          @mousemove="(e) => onMagneticMove(e, ($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
+          @mouseleave="(e) => onMagneticLeave(($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
+        >
+          <p class="stat-card__value">{{ todayStats.conceptsLearned }}<small> 个</small></p>
+          <p class="stat-card__label">掌握概念</p>
+          <div class="stat-card__bar"><div class="stat-card__bar-fill stat-card__bar-fill--green" style="width:50%"></div></div>
+          <p class="stat-card__sub">今日目标 10 个</p>
+        </div>
+        <div
+          class="stat-card magnetic-card"
+          @mousemove="(e) => onMagneticMove(e, ($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
+          @mouseleave="(e) => onMagneticLeave(($event.target as HTMLElement).closest('.magnetic-card') as HTMLElement)"
+        >
+          <p class="stat-card__value stat-card__value--green">+{{ todayStats.accuracy }}<small>%</small></p>
+          <p class="stat-card__label">答题正确率</p>
+          <div class="stat-card__bar"><div class="stat-card__bar-fill stat-card__bar-fill--green" style="width:78%"></div></div>
+          <p class="stat-card__sub">较昨日 +5%</p>
         </div>
       </div>
+    </section>
+
+    <!-- ====== Quick Actions ====== -->
+    <section class="section-spaced stagger-item">
+      <p class="eyebrow">开始学习</p>
+      <h2 class="section-title">选择提问方式</h2>
       <div class="quick-actions-grid">
         <button
           v-for="(method, i) in askMethods"
           :key="method.key"
-          class="quick-action-card"
+          class="qa-card"
           :class="`qa-delay-${i}`"
-          :style="{
-            '--card-gradient': method.gradient,
-            '--card-shadow': method.shadowColor,
-          }"
+          :style="{ '--qa-gradient': method.gradient, '--qa-color': method.shadowColor }"
           @click="router.push(method.path)"
         >
-          <div class="quick-action-card__icon-wrap">
-            <div class="quick-action-card__icon-bg"></div>
-            <component :is="method.icon" :size="22" class="quick-action-card__icon" />
+          <div class="qa-card__icon-wrap">
+            <component :is="method.icon" :size="22" class="qa-card__icon" />
           </div>
-          <div class="quick-action-card__info">
-            <span class="quick-action-card__label">{{ method.label }}</span>
-            <span class="quick-action-card__desc">{{ method.desc }}</span>
+          <div class="qa-card__info">
+            <span class="qa-card__label">{{ method.label }}</span>
+            <span class="qa-card__desc">{{ method.desc }}</span>
           </div>
-          <ChevronRight :size="16" class="quick-action-card__arrow" />
+          <ChevronRight :size="15" class="qa-card__arrow" />
         </button>
       </div>
     </section>
 
-    <!-- ====== Subjects: Magazine-style Cards ====== -->
-    <section class="mb-8 stagger-item">
-      <div class="section-header">
-        <div>
-          <h3 class="section-title">按科目浏览</h3>
-          <p class="section-desc">选择你的薄弱科目重点突破</p>
-        </div>
-        <button class="section-link-btn">
-          全部科目 <ChevronRight :size="14" />
-        </button>
-      </div>
+    <!-- ====== Subjects ====== -->
+    <section class="section-spaced stagger-item">
+      <p class="eyebrow">按科目浏览</p>
+      <h2 class="section-title">重点突破薄弱科目</h2>
       <div class="subjects-grid">
         <button
           v-for="subj in subjects"
@@ -430,7 +384,7 @@ function onMagneticLeave(el: HTMLElement) {
           @click="goToSubject(subj.name)"
         >
           <div class="subject-card__top">
-            <span class="subject-card__emoji">{{ subj.icon }}</span>
+            <component :is="subj.icon" :size="24" :style="{ color: subj.color }" />
             <div class="subject-card__badges">
               <span v-if="subj.hot" class="subject-card__hot">HOT</span>
               <span class="subject-card__count">{{ subj.count }}题</span>
@@ -438,27 +392,17 @@ function onMagneticLeave(el: HTMLElement) {
           </div>
           <span class="subject-card__name">{{ subj.name }}</span>
           <div class="subject-card__bar-wrap">
-            <div
-              class="subject-card__bar"
-              :style="{ width: `${subj.progress}%`, background: subj.color }"
-            ></div>
+            <div class="subject-card__bar" :style="{ width: `${subj.progress}%`, background: subj.color }"></div>
           </div>
           <span class="subject-card__progress-text">掌握 {{ subj.progress }}%</span>
         </button>
       </div>
     </section>
 
-    <!-- ====== Recent Questions: Timeline Layout ====== -->
-    <section class="mb-8 stagger-item">
-      <div class="section-header">
-        <div>
-          <h3 class="section-title">最近提问</h3>
-          <p class="section-desc">继续未完成的讨论</p>
-        </div>
-        <button class="section-link-btn">
-          查看全部 <ChevronRight :size="14" />
-        </button>
-      </div>
+    <!-- ====== Recent Questions ====== -->
+    <section class="section-spaced stagger-item">
+      <p class="eyebrow">继续学习</p>
+      <h2 class="section-title">最近提问</h2>
       <div class="timeline-list">
         <button
           v-for="(q, i) in recentQuestions"
@@ -471,10 +415,7 @@ function onMagneticLeave(el: HTMLElement) {
           <div class="timeline-item__body">
             <p class="timeline-item__question">{{ q.question }}</p>
             <div class="timeline-item__meta">
-              <span
-                class="timeline-item__subject"
-                :style="{ color: q.accentColor, background: `${q.accentColor}12` }"
-              >
+              <span class="timeline-item__subject" :style="{ color: q.accentColor, background: `${q.accentColor}12` }">
                 {{ q.subject }}
               </span>
               <span class="timeline-item__time">{{ q.time }}</span>
@@ -489,52 +430,51 @@ function onMagneticLeave(el: HTMLElement) {
       </div>
     </section>
 
-    <!-- ====== AI Powers: Masonry Grid ====== -->
-    <section class="mb-8 stagger-item">
-      <div class="section-header">
-        <div class="flex items-center gap-2">
-          <Zap :size="18" class="text-amber-500" />
-          <div>
-            <h3 class="section-title">AI 超能力</h3>
-            <p class="section-desc">TuringMate 独家智能学习引擎</p>
-          </div>
-        </div>
-      </div>
-      <div class="powers-masonry">
+    <!-- ====== AI Powers ====== -->
+    <section class="section-spaced stagger-item">
+      <p class="eyebrow">AI 超能力</p>
+      <h2 class="section-title">TuringMate 独家学习引擎</h2>
+      <div class="powers-grid">
         <button
           v-for="(power, i) in aiPowers"
           :key="power.title"
           class="power-card"
-          :class="[
-            `power-card--${power.size}`,
-            `pw-delay-${i}`,
-          ]"
-          :style="{
-            '--pw-color': power.color,
-            '--pw-gradient': power.gradient,
-          }"
+          :class="[`power-card--${power.size}`, `pw-delay-${i}`]"
+          :style="{ '--pw-color': power.color, '--pw-gradient': power.gradient }"
           @click="router.push(power.path)"
         >
-          <div class="power-card__glow"></div>
           <div class="power-card__icon-ring">
-            <component :is="power.icon" :size="20" class="power-card__icon" />
+            <component :is="power.icon" :size="18" class="power-card__icon" />
           </div>
           <div class="power-card__text">
             <p class="power-card__title">{{ power.title }}</p>
             <p class="power-card__desc">{{ power.desc }}</p>
           </div>
           <div class="power-card__arrow-wrap">
-            <Play :size="14" class="power-card__play" />
+            <Play :size="12" class="power-card__play" />
           </div>
         </button>
       </div>
     </section>
 
-    <!-- ====== Weak Topic Alert ====== -->
-    <section class="pb-6 stagger-item">
+    <!-- ====== Encouragement ====== -->
+    <section class="section-spaced stagger-item">
+      <div class="encouragement-card">
+        <Quote :size="28" class="encouragement-card__icon" />
+        <p class="encouragement-card__text">
+          每一个算法都有它的美，<br />每一次坚持都离梦想更近一步。
+        </p>
+        <p class="encouragement-card__sub">
+          已坚持学习 <strong>{{ todayStats.streakDays }}</strong> 天，继续加油
+        </p>
+      </div>
+    </section>
+
+    <!-- ====== Weak Topic ====== -->
+    <section class="section-spaced stagger-item">
       <div class="weak-topic-card">
         <div class="weak-topic-card__icon-wrap">
-          <Lightbulb :size="22" class="weak-topic-card__icon" />
+          <Lightbulb :size="20" class="weak-topic-card__icon" />
         </div>
         <div class="weak-topic-card__info">
           <p class="weak-topic-card__title">
@@ -542,18 +482,12 @@ function onMagneticLeave(el: HTMLElement) {
           </p>
           <div class="weak-topic-card__progress-row">
             <div class="weak-topic-card__bar-bg">
-              <div
-                class="weak-topic-card__bar-fill"
-                :style="{ width: `${todayStats.weakAccuracy}%` }"
-              ></div>
+              <div class="weak-topic-card__bar-fill" :style="{ width: `${todayStats.weakAccuracy}%` }"></div>
             </div>
             <span class="weak-topic-card__percent">{{ todayStats.weakAccuracy }}% 正确率</span>
           </div>
         </div>
-        <button class="weak-topic-card__btn">
-          去练习
-          <span class="weak-topic-card__btn-ripple"></span>
-        </button>
+        <button class="weak-topic-card__btn">去练习</button>
       </div>
     </section>
   </div>
@@ -561,12 +495,12 @@ function onMagneticLeave(el: HTMLElement) {
 
 <style scoped>
 /* ============================
-   1. BASE & PARTICLES
+   1. GLOBAL: Entrance & Spacing
    ============================ */
 .home-view {
   opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transform: translateY(8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
 }
 
 .home-view.is-mounted {
@@ -574,6 +508,11 @@ function onMagneticLeave(el: HTMLElement) {
   transform: translateY(0);
 }
 
+.section-spaced {
+  margin-bottom: 48px;
+}
+
+/* Stagger entrance animation */
 .stagger-item {
   opacity: 0;
   transform: translateY(16px);
@@ -590,6 +529,9 @@ function onMagneticLeave(el: HTMLElement) {
 .is-mounted .stagger-item:nth-child(4) { animation-delay: 0.26s; }
 .is-mounted .stagger-item:nth-child(5) { animation-delay: 0.33s; }
 .is-mounted .stagger-item:nth-child(6) { animation-delay: 0.40s; }
+.is-mounted .stagger-item:nth-child(7) { animation-delay: 0.47s; }
+.is-mounted .stagger-item:nth-child(8) { animation-delay: 0.54s; }
+.is-mounted .stagger-item:nth-child(9) { animation-delay: 0.61s; }
 
 /* Floating particles */
 .floating-particles {
@@ -607,7 +549,7 @@ function onMagneticLeave(el: HTMLElement) {
   animation: floatParticle 12s infinite ease-in-out;
 }
 
-.p1 { width: 6px; height: 6px; background: #818CF8; top: 15%; left: 8%; animation-delay: 0s; }
+.p1 { width: 6px; height: 6px; background: #a78bfa; top: 15%; left: 8%; animation-delay: 0s; }
 .p2 { width: 4px; height: 4px; background: #34D399; top: 45%; left: 85%; animation-delay: 2s; }
 .p3 { width: 5px; height: 5px; background: #F472B6; top: 70%; left: 15%; animation-delay: 4s; }
 .p4 { width: 8px; height: 8px; background: #38BDF8; top: 25%; left: 92%; animation-delay: 6s; }
@@ -622,29 +564,59 @@ function onMagneticLeave(el: HTMLElement) {
 }
 
 /* ============================
-   2. HERO SECTION
+   2. TYPOGRAPHY: Eyebrow & Section Title
+   ============================ */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-amber-600, #b45389);
+  margin-bottom: 8px;
+}
+
+.eyebrow-icon {
+  color: var(--color-amber-500, #f59e0b);
+}
+
+.eyebrow-sep {
+  color: var(--color-text-muted, #d1d5db);
+  font-weight: 400;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary, #111827);
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  margin-bottom: 16px;
+}
+
+/* ============================
+   3. HERO SECTION
    ============================ */
 .hero-section {
-  position: relative;
-  z-index: 1;
+  margin-bottom: 48px;
 }
 
-.hero-card {
+.hero-grid {
   position: relative;
-  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border-light, #eae6ef);
   border-radius: 24px;
-  padding: 32px 28px;
+  padding: 40px 36px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
   overflow: hidden;
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 4px 30px rgba(0,0,0,0.04);
-  transition: box-shadow 0.3s ease;
 }
 
-.hero-card:hover {
-  box-shadow: 0 8px 40px rgba(0,0,0,0.08);
-}
-
-/* Multi-color glow blobs */
+/* Glow blobs */
 .glow-blob {
   position: absolute;
   border-radius: 50%;
@@ -656,13 +628,13 @@ function onMagneticLeave(el: HTMLElement) {
 
 .blob-1 {
   width: 200px; height: 200px;
-  background: linear-gradient(135deg, #818CF8, #A78BFA);
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
   top: -60px; right: -40px;
 }
 
 .blob-2 {
   width: 160px; height: 160px;
-  background: linear-gradient(135deg, #34D399, #6EE7B7);
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
   bottom: -50px; left: -30px;
 }
 
@@ -679,26 +651,11 @@ function onMagneticLeave(el: HTMLElement) {
   100% { transform: translate(-10px, 10px) scale(0.95); }
 }
 
-.hero-content {
+.hero-text {
   position: relative;
   z-index: 2;
-}
-
-/* Status badges */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-badge--ai {
-  background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-  color: #4F46E5;
-  border: 1px solid #C7D2FE;
+  flex: 1;
+  min-width: 0;
 }
 
 .sparkle-icon {
@@ -710,95 +667,56 @@ function onMagneticLeave(el: HTMLElement) {
   50% { opacity: 0.6; transform: scale(0.85); }
 }
 
-.countdown-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #6B7280;
-  background: #F9FAFB;
-  border: 1px solid #E5E7EB;
-}
-
-.countdown-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #10B981;
-  animation: dotPulse 2s infinite;
-}
-
-@keyframes dotPulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
-  50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(16,185,129,0); }
-}
-
-/* Hero title */
 .hero-title {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 800;
-  line-height: 1.25;
-  color: #111827;
-  margin-bottom: 8px;
-  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--color-text-primary, #111827);
+  letter-spacing: -0.025em;
+  margin-bottom: 10px;
 }
 
 @media (min-width: 768px) {
-  .hero-title { font-size: 34px; }
+  .hero-title {
+    font-size: 44px;
+  }
 }
 
-.gradient-text--fire {
-  background: linear-gradient(135deg, #F97316 0%, #EF4444 50%, #8B5CF6 100%);
+.gradient-text {
+  background: var(--gradient-text-warm, linear-gradient(135deg, #f59e0b, #b45389));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.hero-subtitle {
-  font-size: 14px;
-  color: #6B7280;
-  margin-bottom: 24px;
+.hero-lede {
+  font-size: 15px;
+  color: var(--color-text-secondary, #6b7280);
   line-height: 1.6;
+  margin-bottom: 24px;
+  max-width: 420px;
 }
 
 /* Search Box */
 .search-box {
-  border-radius: 18px;
-  background: #F9FAFB;
-  border: 2px solid #E5E7EB;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 16px;
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1.5px solid var(--color-border-light, #e5e7eb);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
   overflow: hidden;
+  max-width: 520px;
 }
 
 .search-box.is-focused {
-  border-color: #818CF8;
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(129,140,248,0.1), 0 8px 30px rgba(99,102,241,0.12);
+  border-color: var(--color-primary, #a78bfa);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
 }
 
 .search-box__inner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px;
-}
-
-.search-icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.search-icon {
-  color: #6366F1;
+  gap: 10px;
+  padding: 5px 5px 5px 16px;
 }
 
 .search-input {
@@ -807,51 +725,37 @@ function onMagneticLeave(el: HTMLElement) {
   outline: none;
   background: transparent;
   font-size: 14px;
-  color: #111827;
+  color: var(--color-text-primary, #111827);
   min-width: 0;
 }
 
 .search-input::placeholder {
-  color: #9CA3AF;
+  color: var(--color-text-muted, #9ca3af);
 }
 
 .search-submit-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
   color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 12px rgba(99,102,241,0.35);
+  box-shadow: 0 2px 8px rgba(124,58,237,0.25);
 }
 
 .search-submit-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 20px rgba(99,102,241,0.5);
+  transform: scale(1.04);
+  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
 }
 
 .search-submit-btn:active {
-  transform: scale(0.95);
-}
-
-.search-submit-ripple {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.search-submit-btn:hover .search-submit-ripple {
-  opacity: 1;
+  transform: scale(0.96);
 }
 
 /* Hot Tags */
@@ -860,12 +764,12 @@ function onMagneticLeave(el: HTMLElement) {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-top: 1px solid #F3F4F6;
+  border-top: 1px solid var(--color-border-light, #f3f4f6);
   flex-wrap: wrap;
 }
 
 .hot-tags-icon {
-  color: #F59E0B;
+  color: #f59e0b;
   flex-shrink: 0;
 }
 
@@ -876,8 +780,8 @@ function onMagneticLeave(el: HTMLElement) {
   padding: 4px 10px;
   border-radius: 14px;
   font-size: 11px;
-  color: #4B5563;
-  background: #F3F4F6;
+  color: var(--color-text-secondary, #4b5563);
+  background: var(--color-bg-secondary, #f3f4f6);
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -887,7 +791,6 @@ function onMagneticLeave(el: HTMLElement) {
   color: var(--tag-color);
   background: color-mix(in srgb, var(--tag-color) 8%, #fff);
   border-color: color-mix(in srgb, var(--tag-color) 20%, transparent);
-  transform: translateY(-1px);
 }
 
 .hot-tag__badge {
@@ -899,229 +802,160 @@ function onMagneticLeave(el: HTMLElement) {
   color: #fff;
 }
 
-/* ============================
-   3. FEATURE BANNER (Asymmetric)
-   ============================ */
-.feature-banner__grid {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  grid-template-rows: auto auto;
-  gap: 12px;
-}
-
-@media (max-width: 640px) {
-  .feature-banner__grid {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto;
-  }
-}
-
-/* Large stat card */
-.feature-stat-card {
-  grid-row: 1 / 3;
+/* Hero Visual — geometric brand decoration */
+.hero-visual {
   position: relative;
-  background: linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 50%, #FDF2F8 100%);
-  border-radius: 20px;
-  padding: 24px;
-  border: 1px solid rgba(99,102,241,0.12);
-  cursor: pointer;
-  overflow: hidden;
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  width: 220px;
+  height: 220px;
+  flex-shrink: 0;
+  display: none;
 }
 
-@media (max-width: 640px) {
-  .feature-stat-card {
-    grid-column: 1 / -1;
-    grid-row: auto;
+@media (min-width: 768px) {
+  .hero-visual {
+    display: block;
   }
 }
 
-.feature-stat-card__glow {
+.hv-ring {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.12), transparent 60%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-light, #e5e7eb);
 }
 
-.feature-stat-card:hover .feature-stat-card__glow {
-  opacity: 1;
+.hv-ring--1 {
+  inset: 0;
 }
 
-.feature-stat-card__content {
-  position: relative;
-  z-index: 1;
+.hv-ring--2 {
+  inset: 30px;
+  border-style: dashed;
+  border-color: var(--color-border, #dbd7e0);
 }
 
-.feature-stat-card__icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+.hv-ring--3 {
+  inset: 60px;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--color-primary, #7c3aed) 25%, transparent);
+}
+
+.hv-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-primary, #7c3aed);
+  opacity: 0.5;
+}
+
+.hv-dot--1 { top: 8px; left: 50%; transform: translateX(-50%); }
+.hv-dot--2 { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.hv-dot--3 { left: 8px; top: 50%; transform: translateY(-50%); }
+.hv-dot--4 { right: 8px; top: 50%; transform: translateY(-50%); }
+.hv-dot--5 { top: 36px; left: 36px; background: #f59e0b; }
+.hv-dot--6 { bottom: 52px; right: 48px; background: #10b981; }
+
+.hv-center {
+  position: absolute;
+  inset: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(167,139,250,0.04));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 14px rgba(99,102,241,0.3);
 }
 
-.feature-stat-card__value {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  margin-bottom: 4px;
+.hv-center-icon {
+  color: var(--color-primary, #7c3aed);
+  opacity: 0.7;
 }
 
-.feature-stat-card__number {
-  font-size: 42px;
+/* ============================
+   4. STATS ROW
+   ============================ */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 540px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  padding: 20px;
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border-light, #f3f4f6);
+  border-radius: 16px;
+  transition: border-color 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--color-border, #dbd7e0);
+}
+
+.stat-card__value {
+  font-size: 28px;
   font-weight: 800;
-  color: #1F2937;
-  line-height: 1;
-  background: linear-gradient(135deg, #6366F1, #A78BFA);
+  color: var(--color-text-primary, #1f2937);
+  line-height: 1.1;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.feature-stat-card__unit {
-  font-size: 14px;
-  font-weight: 600;
-  color: #6B7280;
+.stat-card__value--green {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.feature-stat-card__label {
+.stat-card__value small {
   font-size: 13px;
-  color: #6B7280;
-  margin-bottom: 16px;
+  font-weight: 600;
+  -webkit-text-fill-color: var(--color-text-secondary, #6b7280);
 }
 
-.feature-stat-card__progress {
-  height: 6px;
-  background: rgba(99,102,241,0.12);
-  border-radius: 3px;
+.stat-card__label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
   margin-bottom: 12px;
+}
+
+.stat-card__bar {
+  height: 5px;
+  background: rgba(124,58,237,0.08);
+  border-radius: 3px;
+  margin-bottom: 10px;
   overflow: hidden;
 }
 
-.feature-stat-card__bar {
+.stat-card__bar-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #6366F1, #A78BFA);
-  animation: barGrow 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes barGrow {
-  from { width: 0 !important; }
+.stat-card__bar-fill--green {
+  background: linear-gradient(90deg, #10b981, #34d399);
 }
 
-.feature-stat-card__sub {
-  font-size: 12px;
-  color: #9CA3AF;
+.stat-card__sub {
+  font-size: 11px;
+  color: var(--color-text-muted, #9ca3af);
 }
 
-.feature-stat-card__sub strong {
-  color: #6366F1;
+.stat-card__sub strong {
+  color: #7c3aed;
   font-weight: 700;
-}
-
-/* Mini cards */
-.feature-mini-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px;
-  background: #fff;
-  border-radius: 16px;
-  border: 1px solid #F3F4F6;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.feature-mini-card:hover {
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  border-color: #E5E7EB;
-}
-
-.feature-mini-card__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: #fff;
-}
-
-.feature-mini-card__icon--green {
-  background: linear-gradient(135deg, #34D399, #10B981);
-  box-shadow: 0 3px 10px rgba(16,185,129,0.25);
-}
-
-.feature-mini-card__icon--blue {
-  background: linear-gradient(135deg, #38BDF8, #0EA5E9);
-  box-shadow: 0 3px 10px rgba(14,165,233,0.25);
-}
-
-.feature-mini-card__value {
-  font-size: 22px;
-  font-weight: 800;
-  color: #1F2937;
-  line-height: 1.2;
-}
-
-.feature-mini-card__value--green {
-  color: #10B981;
-}
-
-.feature-mini-card__label {
-  font-size: 12px;
-  color: #9CA3AF;
-}
-
-/* ============================
-   4. SECTION HEADERS
-   ============================ */
-.section-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
-}
-
-.section-desc {
-  font-size: 13px;
-  color: #9CA3AF;
-  margin-top: 2px;
-}
-
-.section-link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #6366F1;
-  background: #EEF2FF;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.section-link-btn:hover {
-  background: #E0E7FF;
 }
 
 /* ============================
@@ -1139,107 +973,85 @@ function onMagneticLeave(el: HTMLElement) {
   }
 }
 
-.quick-action-card {
+.qa-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 20px 12px;
-  background: #fff;
-  border: 1px solid #F3F4F6;
-  border-radius: 20px;
+  padding: 22px 14px;
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border-light, #f3f4f6);
+  border-radius: 16px;
   cursor: pointer;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-  overflow: hidden;
+  transition: all 0.2s ease;
 }
 
-.quick-action-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--card-gradient));
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  z-index: 0;
+.qa-card:hover {
+  border-color: color-mix(in srgb, var(--qa-color, #7c3aed) 25%, transparent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--qa-color, #000) 8%, transparent);
 }
 
-.quick-action-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px var(--card-shadow);
-  border-color: transparent;
-}
-
-.quick-action-card:hover::before {
-  opacity: 0.04;
-}
-
-.quick-action-card:active {
-  transform: translateY(-1px) scale(0.98);
-}
-
-.quick-action-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.quick-action-card__icon-wrap {
-  position: relative;
-  width: 48px;
-  height: 48px;
-}
-
-.quick-action-card__icon-bg {
-  position: absolute;
-  inset: 0;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--card-gradient));
+.qa-card__icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--qa-gradient));
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.12;
-  transition: opacity 0.3s, transform 0.3s;
+  transition: opacity 0.2s;
 }
 
-.quick-action-card:hover .quick-action-card__icon-bg {
-  opacity: 0.2;
-  transform: scale(1.1);
+.qa-card:hover .qa-card__icon-wrap {
+  opacity: 0.18;
 }
 
-.quick-action-card__icon {
+.qa-card__icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qa-card__icon {
   position: absolute;
   inset: 0;
   margin: auto;
-  color: #4B5563;
-  transition: all 0.3s;
+  color: var(--color-text-secondary, #4b5563);
 }
 
-.quick-action-card:hover .quick-action-card__icon {
-  color: #1F2937;
-}
-
-.quick-action-card__label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1F2937;
-}
-
-.quick-action-card__desc {
-  font-size: 11px;
-  color: #9CA3AF;
+.qa-card__info {
   text-align: center;
 }
 
-.quick-action-card__arrow {
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: all 0.3s;
-  color: #D1D5DB;
+.qa-card__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1f2937);
 }
 
-.quick-action-card:hover .quick-action-card__arrow {
+.qa-card__desc {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted, #9ca3af);
+  margin-top: 2px;
+}
+
+.qa-card__arrow {
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.2s;
+  color: var(--color-text-muted, #d1d5db);
+}
+
+.qa-card:hover .qa-card__arrow {
   opacity: 1;
   transform: translateX(0);
 }
 
-/* Staggered delays */
 .qa-delay-0 { animation: qaSlideIn 0.5s 0s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .qa-delay-1 { animation: qaSlideIn 0.5s 0.06s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .qa-delay-2 { animation: qaSlideIn 0.5s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -1270,16 +1082,16 @@ function onMagneticLeave(el: HTMLElement) {
   flex-direction: column;
   gap: 8px;
   padding: 18px 16px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--subj-bg);
   border: 1px solid color-mix(in srgb, var(--subj-color) 10%, transparent);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.2s ease;
 }
 
 .subject-card:hover {
   border-color: color-mix(in srgb, var(--subj-color) 30%, transparent);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--subj-color) 12%, transparent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--subj-color) 8%, transparent);
   transform: translateY(-2px);
 }
 
@@ -1287,11 +1099,6 @@ function onMagneticLeave(el: HTMLElement) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.subject-card__emoji {
-  font-size: 28px;
-  line-height: 1;
 }
 
 .subject-card__badges {
@@ -1305,13 +1112,13 @@ function onMagneticLeave(el: HTMLElement) {
   border-radius: 6px;
   font-size: 10px;
   font-weight: 700;
-  color: #EF4444;
+  color: #ef4444;
   background: rgba(239,68,68,0.1);
 }
 
 .subject-card__count {
   font-size: 11px;
-  color: #9CA3AF;
+  color: var(--color-text-muted, #9ca3af);
 }
 
 .subject-card__name {
@@ -1322,7 +1129,7 @@ function onMagneticLeave(el: HTMLElement) {
 
 .subject-card__bar-wrap {
   height: 4px;
-  background: rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.05);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -1330,12 +1137,11 @@ function onMagneticLeave(el: HTMLElement) {
 .subject-card__bar {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .subject-card__progress-text {
   font-size: 11px;
-  color: #9CA3AF;
+  color: var(--color-text-muted, #9ca3af);
 }
 
 /* ============================
@@ -1344,7 +1150,7 @@ function onMagneticLeave(el: HTMLElement) {
 .timeline-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .timeline-item {
@@ -1352,22 +1158,17 @@ function onMagneticLeave(el: HTMLElement) {
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
-  background: #fff;
+  background: var(--color-bg-card, #fff);
   border: 1px solid transparent;
-  border-radius: 16px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.2s ease;
 }
 
 .timeline-item:hover {
-  background: #FAFBFF;
-  border-color: #E5E7EB;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  transform: translateX(4px);
-}
-
-.timeline-item:active {
-  transform: translateX(2px) scale(0.995);
+  background: var(--color-bg-secondary, #fafbff);
+  border-color: var(--color-border-light, #e5e7eb);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
 }
 
 .timeline-item__accent {
@@ -1386,7 +1187,7 @@ function onMagneticLeave(el: HTMLElement) {
 .timeline-item__question {
   font-size: 14px;
   font-weight: 600;
-  color: #1F2937;
+  color: var(--color-text-primary, #1f2937);
   line-height: 1.5;
   margin-bottom: 6px;
 }
@@ -1407,7 +1208,7 @@ function onMagneticLeave(el: HTMLElement) {
 
 .timeline-item__time {
   font-size: 11px;
-  color: #9CA3AF;
+  color: var(--color-text-muted, #9ca3af);
 }
 
 .timeline-item__replies {
@@ -1415,13 +1216,13 @@ function onMagneticLeave(el: HTMLElement) {
   align-items: center;
   gap: 3px;
   font-size: 11px;
-  color: #6B7280;
+  color: var(--color-text-secondary, #6b7280);
 }
 
 .timeline-item__pending {
   font-size: 10px;
   font-weight: 600;
-  color: #F59E0B;
+  color: #f59e0b;
   background: rgba(245,158,11,0.1);
   padding: 2px 7px;
   border-radius: 6px;
@@ -1431,8 +1232,8 @@ function onMagneticLeave(el: HTMLElement) {
   flex-shrink: 0;
   opacity: 0;
   transform: translateX(-4px);
-  transition: all 0.3s;
-  color: #D1D5DB;
+  transition: all 0.2s;
+  color: var(--color-text-muted, #d1d5db);
 }
 
 .timeline-item:hover .timeline-item__arrow {
@@ -1451,16 +1252,16 @@ function onMagneticLeave(el: HTMLElement) {
 }
 
 /* ============================
-   8. AI POWERS MASONRY
+   8. AI POWERS GRID
    ============================ */
-.powers-masonry {
+.powers-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
 @media (min-width: 640px) {
-  .powers-masonry {
+  .powers-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
@@ -1471,12 +1272,11 @@ function onMagneticLeave(el: HTMLElement) {
   flex-direction: column;
   gap: 12px;
   padding: 20px 16px;
-  border-radius: 20px;
-  background: #fff;
-  border: 1px solid #F3F4F6;
+  border-radius: 16px;
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border-light, #f3f4f6);
   cursor: pointer;
-  overflow: hidden;
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.2s ease;
 }
 
 .power-card--large {
@@ -1490,47 +1290,21 @@ function onMagneticLeave(el: HTMLElement) {
   }
 }
 
-.power-card__glow {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--pw-color) 15%, transparent), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.power-card:hover .power-card__glow {
-  opacity: 1;
-}
-
 .power-card:hover {
   border-color: color-mix(in srgb, var(--pw-color) 25%, transparent);
-  box-shadow: 0 8px 30px color-mix(in srgb, var(--pw-color) 12%, transparent);
-  transform: translateY(-3px);
-}
-
-.power-card:active {
-  transform: translateY(-1px) scale(0.99);
-}
-
-.power-card > * {
-  position: relative;
-  z-index: 1;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--pw-color) 8%, transparent);
+  transform: translateY(-2px);
 }
 
 .power-card__icon-ring {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--pw-gradient));
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--pw-color) 35%, transparent);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.power-card:hover .power-card__icon-ring {
-  transform: scale(1.08) rotate(-3deg);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--pw-color) 30%, transparent);
 }
 
 .power-card__icon {
@@ -1540,28 +1314,28 @@ function onMagneticLeave(el: HTMLElement) {
 .power-card__title {
   font-size: 14px;
   font-weight: 700;
-  color: #1F2937;
+  color: var(--color-text-primary, #1f2937);
   line-height: 1.3;
 }
 
 .power-card__desc {
   font-size: 12px;
-  color: #9CA3AF;
+  color: var(--color-text-muted, #9ca3af);
   margin-top: 3px;
   line-height: 1.5;
 }
 
 .power-card__arrow-wrap {
   margin-top: auto;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: #F3F4F6;
+  background: var(--color-bg-secondary, #f3f4f6);
   display: flex;
   align-items: center;
   justify-content: center;
   align-self: flex-end;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.2s ease;
   opacity: 0;
   transform: scale(0.8);
 }
@@ -1573,8 +1347,8 @@ function onMagneticLeave(el: HTMLElement) {
 }
 
 .power-card__play {
-  color: #9CA3AF;
-  transition: color 0.3s;
+  color: var(--color-text-muted, #9ca3af);
+  transition: color 0.2s;
 }
 
 .power-card:hover .power-card__play {
@@ -1594,17 +1368,56 @@ function onMagneticLeave(el: HTMLElement) {
 }
 
 /* ============================
-   9. WEAK TOPIC CARD
+   9. ENCOURAGEMENT
+   ============================ */
+.encouragement-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 24px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(245,158,11,0.04), rgba(124,58,237,0.03));
+  border: 1px solid rgba(245,158,11,0.1);
+}
+
+.encouragement-card__icon {
+  color: var(--color-amber-400, #fbbf24);
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.encouragement-card__text {
+  font-size: 1.15rem;
+  line-height: 1.8;
+  color: var(--color-text-primary);
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  font-family: var(--font-serif, 'Noto Serif SC', 'Source Han Serif SC', serif);
+}
+
+.encouragement-card__sub {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.encouragement-card__sub strong {
+  color: var(--color-amber-600, #d97706);
+  font-weight: 700;
+}
+
+/* ============================
+   10. WEAK TOPIC
    ============================ */
 .weak-topic-card {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 20px 24px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #FEF2F2, #FFF7ED);
-  border: 1px solid rgba(239,68,68,0.15);
-  transition: all 0.3s ease;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(239,68,68,0.04), rgba(249,115,22,0.03));
+  border: 1px solid rgba(239,68,68,0.1);
+  transition: border-color 0.2s ease;
   animation: weakPulse 3s infinite ease-in-out;
 }
 
@@ -1614,20 +1427,23 @@ function onMagneticLeave(el: HTMLElement) {
 }
 
 .weak-topic-card:hover {
-  border-color: rgba(239,68,68,0.3);
   animation: none;
 }
 
+.weak-topic-card:hover {
+  border-color: rgba(239,68,68,0.2);
+}
+
 .weak-topic-card__icon-wrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #FCA5A5, #F87171);
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fca5a5, #f87171);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(239,68,68,0.3);
+  box-shadow: 0 3px 12px rgba(239,68,68,0.2);
 }
 
 .weak-topic-card__icon {
@@ -1642,12 +1458,12 @@ function onMagneticLeave(el: HTMLElement) {
 .weak-topic-card__title {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-primary, #374151);
   margin-bottom: 8px;
 }
 
 .weak-topic-card__highlight {
-  color: #EF4444;
+  color: #ef4444;
   font-weight: 700;
 }
 
@@ -1660,7 +1476,7 @@ function onMagneticLeave(el: HTMLElement) {
 .weak-topic-card__bar-bg {
   flex: 1;
   height: 5px;
-  background: rgba(239,68,68,0.12);
+  background: rgba(239,68,68,0.1);
   border-radius: 3px;
   overflow: hidden;
   max-width: 140px;
@@ -1669,61 +1485,61 @@ function onMagneticLeave(el: HTMLElement) {
 .weak-topic-card__bar-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #FCA5A5, #EF4444);
-  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+  background: linear-gradient(90deg, #fca5a5, #ef4444);
 }
 
 .weak-topic-card__percent {
   font-size: 12px;
   font-weight: 700;
-  color: #EF4444;
+  color: #ef4444;
 }
 
 .weak-topic-card__btn {
   padding: 10px 20px;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, #F87171, #EF4444);
+  background: linear-gradient(135deg, #f87171, #ef4444);
   border: none;
   cursor: pointer;
   flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  box-shadow: 0 3px 12px rgba(239,68,68,0.3);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(239,68,68,0.25);
 }
 
 .weak-topic-card__btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(239,68,68,0.4);
+  box-shadow: 0 4px 16px rgba(239,68,68,0.35);
 }
 
 .weak-topic-card__btn:active {
-  transform: scale(0.96);
-}
-
-.weak-topic-card__btn-ripple {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.weak-topic-card__btn:hover .weak-topic-card__btn-ripple {
-  opacity: 1;
+  transform: scale(0.97);
 }
 
 /* ============================
-   10. RESPONSIVE
+   11. RESPONSIVE
    ============================ */
 @media (max-width: 480px) {
-  .hero-card { padding: 24px 18px; }
-  .hero-title { font-size: 24px; }
-  .weak-topic-card { flex-direction: column; align-items: flex-start; }
-  .weak-topic-card__btn { width: 100%; text-align: center; }
-  .weak-topic-card__bar-bg { max-width: 100%; }
+  .hero-grid {
+    padding: 28px 20px;
+  }
+  .hero-title {
+    font-size: 28px;
+  }
+  .section-spaced {
+    margin-bottom: 32px;
+  }
+  .weak-topic-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .weak-topic-card__btn {
+    width: 100%;
+    text-align: center;
+  }
+  .weak-topic-card__bar-bg {
+    max-width: 100%;
+  }
 }
 </style>

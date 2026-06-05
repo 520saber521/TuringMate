@@ -5,11 +5,15 @@
  */
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Lightbulb, SkipForward, Eye, Square, Send } from 'lucide-vue-next'
+import { ArrowLeft, Lightbulb, SkipForward, Eye, Square, Send, BookmarkPlus } from 'lucide-vue-next'
 import { useChat } from '@/composables/useChat'
+import { useMistakeBookStore } from '@/stores/mistakeBook'
 
 const route = useRoute()
 const router = useRouter()
+const mistakeStore = useMistakeBookStore()
+
+const toastMsg = ref('')
 
 const props = defineProps<{ questionId?: string }>()
 
@@ -80,6 +84,20 @@ function endChat() {
   router.push('/')
 }
 
+function addToMistakeBook(aiContent: string, prevUserContent?: string) {
+  const subject = (route.query.subject as string) || '数据结构'
+  const content = prevUserContent || aiContent.slice(0, 100)
+  const reason = 'AI 提示后仍回答错误'
+  mistakeStore.addMistake({
+    questionContent: content,
+    subject,
+    knowledgeTags: [],
+    errorReason: reason,
+  })
+  toastMsg.value = '已加入错题本'
+  setTimeout(() => { toastMsg.value = '' }, 2000)
+}
+
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -112,6 +130,11 @@ function handleKeydown(e: KeyboardEvent) {
       </span>
     </div>
 
+    <!-- Toast -->
+    <transition name="toast-fade">
+      <div v-if="toastMsg" class="toast-bar">{{ toastMsg }}</div>
+    </transition>
+
     <!-- Messages Area -->
     <div
       ref="messagesContainer"
@@ -127,7 +150,7 @@ function handleKeydown(e: KeyboardEvent) {
       </div>
 
       <!-- Chat Bubbles -->
-      <div v-for="msg in messages" :key="msg.id" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+      <div v-for="(msg, idx) in messages" :key="msg.id" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
 
         <!-- AI Bubble -->
         <div v-if="msg.role === 'assistant'" class="max-w-[85%] md:max-w-[70%]">
@@ -154,6 +177,15 @@ function handleKeydown(e: KeyboardEvent) {
                 {{ msg.content }}
                 <span v-if="msg.isStreaming" class="inline-block w-1.5 h-4 bg-purple-400 animate-pulse ml-0.5 align-text-bottom"></span>
               </div>
+              <!-- Add to Mistake Book -->
+              <button
+                v-if="!msg.isStreaming && msg.stage && ['HINT', 'PROBE'].includes(msg.stage)"
+                class="mistake-add-btn mt-1.5 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all"
+                @click="addToMistakeBook(msg.content, idx > 0 ? messages[idx - 1]?.content : '')"
+              >
+                <BookmarkPlus :size="12" />
+                加入错题本
+              </button>
             </div>
           </div>
         </div>
@@ -272,5 +304,43 @@ function handleKeydown(e: KeyboardEvent) {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Mistake add button */
+.mistake-add-btn {
+  color: var(--color-amber-600);
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid transparent;
+}
+.mistake-add-btn:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+/* Toast */
+.toast-bar {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-50);
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  background: var(--color-primary-600);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+  pointer-events: none;
+}
+.toast-fade-enter-active { animation: toastIn 0.3s ease; }
+.toast-fade-leave-active { animation: toastOut 0.3s ease; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
 }
 </style>

@@ -1,0 +1,23 @@
+[
+  {"id": "ds_01", "name": "线性表", "difficulty": 2, "category": "线性结构", "prerequisites": []},
+  {"id": "ds_02", "name": "栈与队列", "difficulty": 2, "category": "线性结构", "prerequisites": ["ds_01"]},
+  {"id": "ds_03", "name": "串与模式匹配", "difficulty": 2, "category": "线性结构", "prerequisites": ["ds_01"]},
+  {"id": "ds_04", "name": "链表操作", "difficulty": 3, "category": "线性结构", "prerequisites": ["ds_01"]},
+  {"id": "ds_05", "name": "二叉树性质与遍历", "difficulty": 3, "category": "树", "prerequisites": ["ds_02"]},
+  {"id": "ds_06", "name": "二叉搜索树", "difficulty": 3, "category": "树", "prerequisites": ["ds_05"]},
+  {"id": "ds_07", "name": "平衡二叉树", "difficulty": 4, "category": "树", "prerequisites": ["ds_06"]},
+  {"id": "ds_08", "name": "哈夫曼树与编码", "difficulty": 3, "category": "树", "prerequisites": ["ds_05"]},
+  {"id": "ds_09", "name": "图的存储与遍历", "difficulty": 4, "category": "图", "prerequisites": ["ds_02"]},
+  {"id": "ds_10", "name": "最小生成树", "difficulty": 4, "category": "图", "prerequisites": ["ds_09"]},
+  {"id": "ds_11", "name": "最短路径", "difficulty": 4, "category": "图", "prerequisites": ["ds_09"]},
+  {"id": "ds_12", "name": "拓扑排序与关键路径", "difficulty": 4, "category": "图", "prerequisites": ["ds_09"]},
+  {"id": "ds_13", "name": "顺序查找与二分查找", "difficulty": 2, "category": "查找", "prerequisites": ["ds_01"]},
+  {"id": "ds_14", "name": "哈希表与冲突解决", "difficulty": 3, "category": "查找", "prerequisites": ["ds_13"]},
+  {"id": "ds_15", "name": "B树与B+树", "difficulty": 4, "category": "查找", "prerequisites": ["ds_06"]},
+  {"id": "ds_16", "name": "插入排序", "difficulty": 2, "category": "排序", "prerequisites": ["ds_01"]},
+  {"id": "ds_17", "name": "交换排序（冒泡/快速）", "difficulty": 3, "category": "排序", "prerequisites": ["ds_16"]},
+  {"id": "ds_18", "name": "选择排序（简单/堆）", "difficulty": 3, "category": "排序", "prerequisites": ["ds_16"]},
+  {"id": "ds_19", "name": "归并排序", "difficulty": 3, "category": "排序", "prerequisites": ["ds_16"]},
+  {"id": "ds_20", "name": "基数排序", "difficulty": 3, "category": "排序", "prerequisites": ["ds_16"]},
+  {"id": "ds_21", "name": "排序算法比较与选择", "difficulty": 4, "category": "排序", "prerequisites": ["ds_17", "ds_18", "ds_19", "ds_20"]}
+]

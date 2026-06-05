@@ -13,14 +13,16 @@
 """
 
 import logging
+import operator
 from enum import Enum
 from typing import AsyncIterator, TypedDict, Annotated
 
 from langchain_core.documents import Document
 from langchain_core.messages import (
     SystemMessage, HumanMessage, AIMessage,
-    BaseMessage, remove_message, add_messages,
+    BaseMessage, RemoveMessage,
 )
+from langgraph.graph.message import add_messages
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langgraph.graph import StateGraph, START, END
@@ -57,6 +59,7 @@ class TutorStage(str, Enum):
 class TutorState(TypedDict):
     """LangGraph 状态定义（含 F2/F3 扩展字段）."""
     messages: Annotated[list[BaseMessage], add_messages]
+    remaining_steps: Annotated[int, operator.add]
     stage: str
     session_id: str
     question_context: dict

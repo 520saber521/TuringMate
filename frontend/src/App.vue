@@ -1,25 +1,67 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { computed } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { useStudyTimerStore } from '@/stores/studyTimer'
+
+const route = useRoute()
+const timer = useStudyTimerStore()
+
+// 判断是否为登录页面（独立页面）
+const isStandalonePage = computed(() => {
+  return route.path === '/login'
+})
+
+// Auto-track: start timer on study pages, pause on non-study pages
+import { watch } from 'vue'
+watch(
+  () => route.path,
+  (path) => {
+    timer.setCurrentRoute(path)
+    if (timer.isStudyRoute(path)) {
+      timer.startTracking()
+    } else {
+      timer.pauseTracking()
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
-  <AppLayout>
+  <!-- 登录页面使用独立全屏布局 -->
+  <template v-if="isStandalonePage">
     <RouterView v-slot="{ Component }">
       <transition name="page" mode="out-in">
         <component :is="Component" />
       </transition>
     </RouterView>
-  </AppLayout>
+  </template>
+  
+  <!-- 其他页面使用主布局 -->
+  <template v-else>
+    <AppLayout>
+      <RouterView v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </RouterView>
+    </AppLayout>
+  </template>
 </template>
 
 <style>
 #app {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: block;
   background-color: var(--color-bg-page);
+}
+
+/* 登录页面特殊处理 */
+#app:has(.auth-page) {
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
 }
 
 /* 页面切换动画 */

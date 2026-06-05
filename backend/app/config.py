@@ -18,8 +18,12 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
     ]
 
     # Database (MySQL)
@@ -29,13 +33,15 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # LLM Configuration - Model Gateway
-    DEFAULT_LLM_MODEL: str = "deepseek"  # deepseek, gpt-4o, qwen
+    DEFAULT_LLM_MODEL: str = "deepseek"  # deepseek, gpt-4o, qwen, doubao
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     QWEN_API_KEY: str = ""
     QWEN_BASE_URL: str = "https://dashscope.aliyuncs.com/api/v1"
+    DOUBAO_API_KEY: str = ""
+    DOUBAO_BASE_URL: str = "https://ark.cn-beijing.volces.com/api/v3"
 
     # RAG Configuration
     EMBEDDING_MODEL: str = "text2vec-base-chinese"  # 开发阶段用本地模型
@@ -47,6 +53,11 @@ class Settings(BaseSettings):
 
     # LangGraph Checkpointer 后端 (M6: memory / postgres / redis)
     CHECKPOINT_BACKEND: str = "memory"
+
+    # Auth / JWT
+    SECRET_KEY: str = "change-me-in-production-use-a-strong-random-key"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # COS (Tencent Cloud Object Storage)
     COS_SECRET_ID: str = ""

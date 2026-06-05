@@ -1,45 +1,56 @@
 """Code visualization API - 代码可视化."""
-from fastapi import APIRouter
-from app.schemas.visualization import VisualizeExecuteResponse
+import uuid
+import logging
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from app.schemas.visualization import VisualizeExecuteResponse, VisualStep
+from app.core.tools import code_executor
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class ExecuteRequest(BaseModel):
+    code: str
+    language: str = "python"
+    test_input: str | None = None
+
+
 @router.post("/execute", response_model=VisualizeExecuteResponse)
-async def execute_and_visualize(
-    code: str,
-    language: str = "python",
-):
+async def execute_and_visualize(body: ExecuteRequest):
     """执行代码并生成执行步骤快照.
 
-    代码执行沙箱运行用户提交的算法代码，
-    记录每步状态变化（变量值、数据结构状态），
-    返回前端用于动画渲染的步骤数据。
+    调用安全的 code_executor 沙箱执行用户代码，
+    记录每步变量状态变化，返回步骤数据供前端可视化渲染。
     """
-    # TODO: 调用 Code Executor 工具执行代码 + 生成快照
+    execution_id = f"exec_{uuid.uuid4().hex[:12]}"
+
+    result = await code_executor.ainvoke({
+        "code": body.code,
+        "language": body.language,
+        "test_input": body.test_input,
+    })
+
+    if not result.get("success"):
+        raise HTTPException(status_code=422, detail=result.get("error", "执行失败"))
+
+    steps = [
+        VisualStep(
+            step_no=s["step_no"],
+            line=s["line"],
+            description=s["description"],
+            variables=s.get("variables", {}),
+            visual_state=s.get("visual_state", {}),
+        )
+        for s in result.get("steps", [])
+    ]
+
     return VisualizeExecuteResponse(
-        execution_id="exec_mock_001",
-        language=language,
-        steps=[
-            {
-                "step_no": 1,
-                "line": 1,
-                "description": "初始化链表头结点",
-                "variables": {"L": {"type": "Node", "value": "head"}},
-                "visual_state": {"nodes": [{"id": "head", "val": None, "next": None}]},
-            },
-            {
-                "step_no": 2,
-                "line": 2,
-                "description": "插入第一个元素 10",
-                "variables": {"L": {"type": "Node", "value": "head"}},
-                "visual_state": {
-                    "nodes": [
-                        {"id": "head", "val": None, "next": "node1"},
-                        {"id": "node1", "val": 10, "next": None},
-                    ]
-                },
-            },
-        ],
-        total_steps=2,
+        execution_id=execution_id,
+        language=body.language,
+        steps=steps,
+        total_steps=len(steps),
+        output=result.get("output", ""),
+        success=result.get("success", False),
+        error=result.get("error"),
     )

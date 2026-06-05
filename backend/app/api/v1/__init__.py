@@ -6,9 +6,13 @@ from app.api.v1 import (
     visualization, upload,
     learning_path, thinking, emotion,
     problem_gen, study_buddy, code_practical,
+    auth,
 )
 
 router = APIRouter()
+
+# ── 认证路由 ──
+router.include_router(auth.router, prefix="/auth", tags=["用户认证"])
 
 # ── 核心功能路由 ──
 router.include_router(question.router, prefix="/question", tags=["题目识别"])

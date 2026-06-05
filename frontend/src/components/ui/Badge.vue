@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { Component } from 'vue'
 
 interface Props {
-  variant?: 'primary' | 'success' | 'warning' | 'danger' | 'info'
+  variant?: 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'amber'
   size?: 'sm' | 'md'
   icon?: Component
 }

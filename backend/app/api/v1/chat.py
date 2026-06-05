@@ -33,13 +33,22 @@ async def start_guided_chat(body: ChatStartRequest):
 
     session_id = f"session_{body.question_id}_{body.user_id}"
 
-    # 构建题目上下文（TODO: 从数据库获取真实题目信息）
+    # 从数据库获取真实题目信息
+    from app.services.question_service import question_service
     question_context = {
         "question_id": body.question_id,
         "subject": "数据结构",
         "knowledge_tags": ["链表", "指针操作"],
         "difficulty": 3,
     }
+    q = await question_service.get_question(body.question_id)
+    if q:
+        question_context = {
+            "question_id": q["id"],
+            "subject": q["subject"],
+            "knowledge_tags": q["knowledge_tags"],
+            "difficulty": q["difficulty"],
+        }
 
     result = await socratic_tutor_agent.generate_first_message(session_id, question_context)
 

@@ -45,11 +45,13 @@ async def get_recommended_practice(user_id: str = "user_001"):
     raw_result = await diagnostician_agent.diagnose(user_id=user_id)
     result = format_agent_result(raw_result)
 
+    import hashlib
     practices = []
     for plan in result.get("study_plan", []):
         for task in plan.get("tasks", []):
+            task_id = hashlib.md5(task.encode()).hexdigest()[:8]
             practices.append({
-                "id": f"p_{hash(task) % 10000:04d}",
+                "id": f"p_{task_id}",
                 "type": "专项练习",
                 "title": task,
                 "count": 5,

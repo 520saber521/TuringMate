@@ -1,0 +1,19 @@
+[
+  {"id": "cn_01", "name": "计算机网络体系结构", "difficulty": 2, "category": "网络体系", "prerequisites": []},
+  {"id": "cn_02", "name": "OSI与TCP/IP模型", "difficulty": 2, "category": "网络体系", "prerequisites": ["cn_01"]},
+  {"id": "cn_03", "name": "物理层基础", "difficulty": 2, "category": "物理层", "prerequisites": ["cn_01"]},
+  {"id": "cn_04", "name": "信道复用技术", "difficulty": 3, "category": "物理层", "prerequisites": ["cn_03"]},
+  {"id": "cn_05", "name": "数据链路层与帧", "difficulty": 3, "category": "数据链路层", "prerequisites": ["cn_02"]},
+  {"id": "cn_06", "name": "差错控制与CRC", "difficulty": 3, "category": "数据链路层", "prerequisites": ["cn_05"]},
+  {"id": "cn_07", "name": "CSMA/CD协议", "difficulty": 4, "category": "数据链路层", "prerequisites": ["cn_05"]},
+  {"id": "cn_08", "name": "以太网与交换机", "difficulty": 3, "category": "数据链路层", "prerequisites": ["cn_05", "cn_07"]},
+  {"id": "cn_09", "name": "IP地址与子网划分", "difficulty": 4, "category": "网络层", "prerequisites": ["cn_02"]},
+  {"id": "cn_10", "name": "路由协议（RIP/OSPF/BGP）", "difficulty": 4, "category": "网络层", "prerequisites": ["cn_09"]},
+  {"id": "cn_11", "name": "ARP与ICMP协议", "difficulty": 3, "category": "网络层", "prerequisites": ["cn_09"]},
+  {"id": "cn_12", "name": "传输层与端口", "difficulty": 2, "category": "传输层", "prerequisites": ["cn_09"]},
+  {"id": "cn_13", "name": "TCP拥塞控制与流量控制", "difficulty": 5, "category": "传输层", "prerequisites": ["cn_12"]},
+  {"id": "cn_14", "name": "UDP协议", "difficulty": 2, "category": "传输层", "prerequisites": ["cn_12"]},
+  {"id": "cn_15", "name": "应用层协议（DNS/HTTP/FTP）", "difficulty": 3, "category": "应用层", "prerequisites": ["cn_12"]},
+  {"id": "cn_16", "name": "DNS解析过程", "difficulty": 4, "category": "应用层", "prerequisites": ["cn_15"]},
+  {"id": "cn_17", "name": "HTTP与HTTPS", "difficulty": 3, "category": "应用层", "prerequisites": ["cn_15"]}
+]

@@ -1,0 +1,18 @@
+[
+  {"id": "co_01", "name": "数制与编码", "difficulty": 2, "category": "数制与运算", "prerequisites": []},
+  {"id": "co_02", "name": "定点数运算", "difficulty": 3, "category": "数制与运算", "prerequisites": ["co_01"]},
+  {"id": "co_03", "name": "浮点数表示与运算", "difficulty": 4, "category": "数制与运算", "prerequisites": ["co_01", "co_02"]},
+  {"id": "co_04", "name": "算术逻辑单元(ALU)", "difficulty": 3, "category": "数制与运算", "prerequisites": ["co_02"]},
+  {"id": "co_05", "name": "存储器层次结构", "difficulty": 2, "category": "存储器", "prerequisites": []},
+  {"id": "co_06", "name": "主存储器（RAM/ROM）", "difficulty": 3, "category": "存储器", "prerequisites": ["co_05"]},
+  {"id": "co_07", "name": "Cache映射与替换", "difficulty": 4, "category": "存储器", "prerequisites": ["co_05", "co_06"]},
+  {"id": "co_08", "name": "虚拟存储器", "difficulty": 4, "category": "存储器", "prerequisites": ["co_07"]},
+  {"id": "co_09", "name": "指令格式与寻址方式", "difficulty": 3, "category": "指令系统", "prerequisites": ["co_01"]},
+  {"id": "co_10", "name": "CISC与RISC", "difficulty": 3, "category": "指令系统", "prerequisites": ["co_09"]},
+  {"id": "co_11", "name": "CPU功能与结构", "difficulty": 3, "category": "中央处理器", "prerequisites": ["co_09"]},
+  {"id": "co_12", "name": "指令流水线", "difficulty": 4, "category": "中央处理器", "prerequisites": ["co_11"]},
+  {"id": "co_13", "name": "数据通路与时序控制", "difficulty": 4, "category": "中央处理器", "prerequisites": ["co_11"]},
+  {"id": "co_14", "name": "总线结构", "difficulty": 2, "category": "总线与I/O", "prerequisites": ["co_11"]},
+  {"id": "co_15", "name": "中断与DMA", "difficulty": 4, "category": "总线与I/O", "prerequisites": ["co_14"]},
+  {"id": "co_16", "name": "I/O接口与编址", "difficulty": 3, "category": "总线与I/O", "prerequisites": ["co_14"]}
+]

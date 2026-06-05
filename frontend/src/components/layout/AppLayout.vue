@@ -60,15 +60,11 @@ provide('toggleSidebar', toggleSidebar)
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(
-    175deg,
-    #f4f2ff 0%,
-    #f7f8fc 8%,
-    #f0f2f8 30%,
-    #f5f7fa 60%,
-    #f0fdfa 85%,
-    #f4f2ff 100%
-  );
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, var(--bg-blob-1, rgba(245, 158, 11, 0.05)) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 45% at 10% 65%, var(--bg-blob-2, rgba(124, 58, 237, 0.03)) 0%, transparent 55%),
+    radial-gradient(ellipse 35% 30% at 92% 18%, var(--bg-blob-3, rgba(56, 189, 248, 0.025)) 0%, transparent 50%),
+    var(--color-bg-page, #faf8f5);
   overflow-x: hidden;
 }
 
@@ -100,8 +96,8 @@ provide('toggleSidebar', toggleSidebar)
   top: -15%;
   left: -10%;
   background: radial-gradient(circle,
-    rgba(108, 92, 231, 0.18) 0%,
-    rgba(99, 102, 241, 0.08) 40%,
+    rgba(124, 58, 237, 0.12) 0%,
+    rgba(245, 158, 11, 0.08) 40%,
     transparent 70%
   );
   animation: blobDriftTL 20s ease-in-out infinite alternate;
@@ -115,8 +111,8 @@ provide('toggleSidebar', toggleSidebar)
   bottom: -10%;
   right: -8%;
   background: radial-gradient(circle,
-    rgba(45, 212, 191, 0.14) 0%,
-    rgba(14, 165, 233, 0.06) 40%,
+    rgba(245, 158, 11, 0.1) 0%,
+    rgba(255, 107, 107, 0.06) 40%,
     transparent 70%
   );
   animation: blobDriftBR 25s ease-in-out infinite alternate;
@@ -131,8 +127,8 @@ provide('toggleSidebar', toggleSidebar)
   left: 50%;
   transform: translate(-50%, -50%);
   background: radial-gradient(circle,
-    rgba(108, 92, 231, 0.06) 0%,
-    rgba(240, 165, 0, 0.04) 40%,
+    rgba(245, 158, 11, 0.07) 0%,
+    rgba(124, 58, 237, 0.04) 40%,
     transparent 70%
   );
   animation: blobDriftCenter 18s ease-in-out infinite alternate;

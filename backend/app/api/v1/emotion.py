@@ -8,6 +8,7 @@ POST /api/v1/emotion/:session/reset  — 重置会话状态
 
 import logging
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from app.agents.emotion_detector import emotion_detector
 

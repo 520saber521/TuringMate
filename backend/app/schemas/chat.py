@@ -13,7 +13,7 @@ class ChatStartResponse(BaseModel):
     """引导对话启动响应."""
     session_id: str
     first_message: str
-    stage: Literal["QUESTION", "HINT", "PROBE", "AFFIRM", "EXTEND", "COMPLETE"]
+    stage: Literal["question", "thinking", "guidance", "practice", "review"]
 
 
 class ChatMessageRequest(BaseModel):

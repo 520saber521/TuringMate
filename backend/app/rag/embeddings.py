@@ -85,5 +85,15 @@ def get_embeddings():
     return _embeddings_instance
 
 
-# 向后兼容
-embeddings = get_embeddings()
+# 向后兼容 — 懒加载，避免模块导入时阻塞
+_embeddings_compat = None
+
+
+def __getattr__(name):
+    """懒加载 embeddings 实例，避免导入时网络请求阻塞."""
+    global _embeddings_compat
+    if name == "embeddings":
+        if _embeddings_compat is None:
+            _embeddings_compat = get_embeddings()
+        return _embeddings_compat
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

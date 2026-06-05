@@ -18,3 +18,6 @@ class VisualizeExecuteResponse(BaseModel):
     language: str
     steps: list[VisualStep]
     total_steps: int
+    output: str = ""
+    success: bool = True
+    error: str | None = None

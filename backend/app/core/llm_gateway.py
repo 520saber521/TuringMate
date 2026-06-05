@@ -46,6 +46,12 @@ MODEL_REGISTRY: dict[str, dict] = {
         "base_url_env": "QWEN_BASE_URL",
         "default_base_url": "https://dashscope.aliyuncs.com/api/v1",
     },
+    "doubao": {
+        "model": "doubao-seed-2.0-lite",
+        "api_key_env": "DOUBAO_API_KEY",
+        "base_url_env": "DOUBAO_BASE_URL",
+        "default_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    },
 }
 
 

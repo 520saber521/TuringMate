@@ -122,17 +122,80 @@ class CodeExecutorInput(BaseModel):
     time_limit: float = Field(default=10.0, description="执行时间限制(秒)")
 
 
+# ── Forbidden imports/patterns for sandbox safety ──
+FORBIDDEN_IMPORTS = {
+    "os", "subprocess", "shutil", "sys", "ctypes", "socket",
+    "requests", "urllib", "http", "ftplib", "telnetlib",
+    "pickle", "marshal", "code", "codeop", "compileall",
+    "importlib", "pkgutil", "pathlib",
+}
+FORBIDDEN_FUNCTIONS = {
+    "exec", "eval", "compile", "open", "__import__",
+    "globals", "locals", "vars", "getattr", "setattr", "delattr",
+    "breakpoint",
+}
+SAFE_BUILTINS = {
+    "abs": abs, "all": all, "any": any, "bin": bin, "bool": bool,
+    "bytes": bytes, "chr": chr, "complex": complex, "dict": dict,
+    "divmod": divmod, "enumerate": enumerate, "filter": filter,
+    "float": float, "format": format, "frozenset": frozenset,
+    "hash": hash, "hex": hex, "int": int, "isinstance": isinstance,
+    "issubclass": issubclass, "iter": iter, "len": len, "list": list,
+    "map": map, "max": max, "min": min, "next": next, "object": object,
+    "oct": oct, "ord": ord, "pow": pow, "print": print, "range": range,
+    "repr": repr, "reversed": reversed, "round": round, "set": set,
+    "slice": slice, "sorted": sorted, "str": str, "sum": sum,
+    "tuple": tuple, "type": type, "zip": zip, "staticmethod": staticmethod,
+    "classmethod": classmethod, "property": property, "super": super,
+    "True": True, "False": False, "None": None,
+    "Exception": Exception, "ValueError": ValueError, "TypeError": TypeError,
+    "KeyError": KeyError, "IndexError": IndexError, "StopIteration": StopIteration,
+    "ZeroDivisionError": ZeroDivisionError, "ArithmeticError": ArithmeticError,
+}
+
+
+def _validate_code_safety(code: str) -> str | None:
+    """Check code for forbidden patterns. Returns error message or None."""
+    import ast
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return f"语法错误: {e}"
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.name.split(".")[0]
+                if name in FORBIDDEN_IMPORTS:
+                    return f"禁止导入模块: {name}"
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                name = node.module.split(".")[0]
+                if name in FORBIDDEN_IMPORTS:
+                    return f"禁止导入模块: {name}"
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_FUNCTIONS:
+                return f"禁止调用函数: {node.func.id}"
+
+    for kw in FORBIDDEN_IMPORTS:
+        if kw in code:
+            # Additional check for string-based bypasses
+            if f"__import__('{kw}')" in code or f'__import__("{kw}")' in code:
+                return f"禁止导入模块: {kw}"
+
+    return None
+
+
 @tool(args_schema=CodeExecutorInput)
 async def code_executor(code: str, language: str = "python", test_input: str = None, time_limit: float = 10.0) -> dict:
     """在沙箱环境中执行算法代码并返回执行步骤快照.
-    
-    支持 Python/C/C++，记录变量状态变化用于可视化。
-    安全限制: 执行时间 10s, 内存 256MB。
+
+    支持 Python 代码，记录变量状态变化用于可视化。
+    安全限制: AST白名单过滤 + 50步上限 + safe builtins + 禁用危险模块。
     """
     import io
-    import contextlib
     import sys
-    import traceback
+    import asyncio
 
     if language != "python":
         return {
@@ -143,86 +206,105 @@ async def code_executor(code: str, language: str = "python", test_input: str = N
             "error": f"当前仅支持 Python, 不支持 {language}",
         }
 
+    # Security check
+    safety_error = _validate_code_safety(code)
+    if safety_error:
+        return {
+            "steps": [],
+            "output": "",
+            "execution_time": 0,
+            "success": False,
+            "error": f"安全限制: {safety_error}",
+        }
+
     output_buf = io.StringIO()
     steps = []
     step_no = 1
 
+    # Build safe execution environment
+    exec_globals = {"__builtins__": SAFE_BUILTINS}
+    exec_locals = {}
+
+    old_stdout = sys.stdout
+    sys.stdout = output_buf
+
     try:
-        # 构建带追踪的执行环境
-        exec_globals = {"__builtins__": __builtins__}
-        exec_locals = {}
+        async def _run():
+            nonlocal step_no, steps
 
-        # 重定向 stdout
-        old_stdout = sys.stdout
-        sys.stdout = output_buf
+            lines = code.strip().split("\n")
+            current_block = []
 
-        # 逐行/逐块执行并记录状态
-        lines = code.strip().split("\n")
-        current_block = []
+            for line in lines:
+                stripped = line.strip()
+                current_block.append(line)
 
-        for line in lines:
-            stripped = line.strip()
-            current_block.append(line)
+                is_complete = not stripped.endswith(":") and (
+                    not stripped or
+                    stripped.startswith(("#", "import ", "from ", "def ", "class "))
+                    or stripped.endswith((")", "]", "}", '"', "'"))
+                )
 
-            # 判断是否为一个完整语句
-            is_complete = not stripped.endswith(":") and (
-                not stripped or
-                stripped.startswith(("#", "import ", "from ", "def ", "class "))
-                or stripped.endswith((")", "]", "}", "\"", "'"))
-            )
+                if is_complete and current_block:
+                    block_code = "\n".join(current_block)
 
-            if is_complete and current_block:
+                    # Record pre-execution state
+                    step_vars = {}
+                    for var_name, var_value in list(exec_locals.items()):
+                        if not var_name.startswith("__"):
+                            try:
+                                step_vars[var_name] = repr(var_value)[:200]
+                            except Exception:
+                                pass
+
+                    steps.append({
+                        "step_no": step_no,
+                        "line": len(steps) + 1,
+                        "description": block_code[:150],
+                        "variables": step_vars,
+                        "visual_state": {},
+                    })
+
+                    try:
+                        exec(compile(block_code, "<sandbox>", "exec"), exec_globals, exec_locals)
+                    except SyntaxError:
+                        continue
+                    except Exception as e:
+                        steps.append({
+                            "step_no": step_no + 1,
+                            "line": len(steps) + 1,
+                            "description": f"运行时错误: {e}",
+                            "variables": {},
+                            "visual_state": {},
+                        })
+                        break
+
+                    step_no += 1
+                    current_block = []
+                    if step_no > 50:
+                        break
+
+            if current_block and step_no <= 50:
                 block_code = "\n".join(current_block)
-
-                # 记录步骤前状态
-                step_vars = {}
-                for var_name, var_value in list(exec_locals.items()):
-                    if not var_name.startswith("__"):
-                        try:
-                            step_vars[var_name] = repr(var_value)[:200]
-                        except Exception:
-                            pass
-
-                steps.append({
-                    "step_no": step_no,
-                    "line": len(steps) + 1,
-                    "description": block_code[:150],
-                    "variables": step_vars,
-                    "visual_state": {},
-                })
-
-                # 执行代码块
                 try:
-                    exec(compile(block_code, "<code_executor>", "exec"), exec_globals, exec_locals)
-                except SyntaxError:
-                    # 可能是多行语句的一部分，继续累积
-                    continue
+                    exec(compile(block_code, "<sandbox>", "exec"), exec_globals, exec_locals)
+                except Exception:
+                    pass
 
-                step_no += 1
-                current_block = []
-                if step_no > 50:  # 安全限制
-                    break
-
-        # 执行剩余未完成块
-        if current_block:
-            block_code = "\n".join(current_block)
-            try:
-                exec(compile(block_code, "<code_executor>", "exec"), exec_globals, exec_locals)
-            except Exception as e:
-                pass
+        await asyncio.wait_for(_run(), timeout=time_limit)
 
         sys.stdout = old_stdout
         output = output_buf.getvalue()
 
         return {
             "steps": steps,
-            "output": output,
+            "output": output or "(无输出)",
             "execution_time": 0.01,
             "success": True,
         }
 
-    except TimeoutError:
-        sys.stdout = getattr(sys, 'stdout', None) or old_stdout if 'old_stdout' in dir() else None
+    except asyncio.TimeoutError:
+        sys.stdout = old_stdout
         return {
             "steps": steps,
             "output": output_buf.getvalue(),
@@ -231,7 +313,7 @@ async def code_executor(code: str, language: str = "python", test_input: str = N
             "error": f"代码执行超时 ({time_limit}s)",
         }
     except Exception as e:
-        sys.stdout = getattr(sys, 'stdout', None) or old_stdout if 'old_stdout' in dir() else None
+        sys.stdout = old_stdout
         return {
             "steps": steps,
             "output": output_buf.getvalue(),
@@ -239,6 +321,8 @@ async def code_executor(code: str, language: str = "python", test_input: str = N
             "success": False,
             "error": f"执行错误: {str(e)[:500]}",
         }
+    finally:
+        sys.stdout = old_stdout
 
 
 # ============================================================

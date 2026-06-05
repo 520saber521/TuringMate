@@ -1,43 +1,40 @@
 @import "tailwindcss";
 
+/* ============================================================
+ * TURINGMATE DESIGN TOKENS v3 — 「暖灯书房」
+ * Warm Scholar · Amber + Ink · Paper Texture
+ * ============================================================ */
+
 :root {
-  /* ============================================
-   * TURINGMATE DESIGN TOKENS v2
-   * 设计令牌 - 深紫蓝学术风 · 专业精致
-   * ============================================ */
-
-  /* ------------------------------
-   * 1. 色彩系统 (Color System)
-   * ------------------------------ */
-
-  /* Primary - 主色调 (Deep Indigo Violet) */
-  --color-primary-50: #f4f2ff;
-  --color-primary-100: #e8e4ff;
-  --color-primary-200: #d1caff;
-  --color-primary-300: #b3a5ff;
-  --color-primary-400: #8f7fff;
-  --color-primary-500: #6c5ce7;
-  --color-primary-600: #5a4bd1;
-  --color-primary-700: #4a3cb5;
-  --color-primary-800: #3c3096;
-  --color-primary-900: #2d2478;
-  --color-primary: var(--color-primary-500);
+  /* ── 1. 主色系 (Primary) — 暖紫墨 Warm Violet Ink ── */
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #7c3aed;
+  --color-primary-600: #6d28d9;
+  --color-primary-700: #5b21b6;
+  --color-primary-800: #4c1d95;
+  --color-primary-900: #3b0764;
+  --color-primary: var(--color-primary-600);
   --color-primary-light: var(--color-primary-400);
-  --color-primary-dark: var(--color-primary-700);
+  --color-primary-dark: var(--color-primary-800);
 
-  /* Secondary - 辅助色 (Teal) */
-  --color-secondary-50: #f0fdfa;
-  --color-secondary-100: #ccfbf1;
-  --color-secondary-200: #99f6e4;
-  --color-secondary-300: #5eead4;
-  --color-secondary-400: #2dd4bf;
-  --color-secondary-500: #14b8a6;
-  --color-secondary-600: #0d9488;
-  --color-secondary-700: #0f766e;
-  --color-secondary-800: #115e59;
-  --color-secondary-900: #134e4a;
+  /* ── 2. 暖调强调色 (Warm Accent) — 琥珀金 Amber Gold ── */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber: var(--color-amber-500);
 
-  /* Success - 成功色 (Emerald) */
+  /* ── 3. 功能色 (Functional) ── */
   --color-success-50: #ecfdf5;
   --color-success-100: #d1fae5;
   --color-success-200: #a7f3d0;
@@ -50,7 +47,6 @@
   --color-success-900: #064e3b;
   --color-success: var(--color-success-600);
 
-  /* Warning - 警告色 (Amber) */
   --color-warning-50: #fffbeb;
   --color-warning-100: #fef3c7;
   --color-warning-200: #fde68a;
@@ -63,7 +59,6 @@
   --color-warning-900: #78350f;
   --color-warning: var(--color-warning-600);
 
-  /* Danger - 危险色 (Rose) */
   --color-danger-50: #fff1f2;
   --color-danger-100: #ffe4e6;
   --color-danger-200: #fecdd3;
@@ -76,7 +71,6 @@
   --color-danger-900: #881337;
   --color-danger: var(--color-danger-600);
 
-  /* Info - 信息色 (Sky Blue) */
   --color-info-50: #f0f9ff;
   --color-info-100: #e0f2fe;
   --color-info-200: #bae6fd;
@@ -89,97 +83,99 @@
   --color-info-900: #0c4a6e;
   --color-info: var(--color-info-600);
 
-  /* Neutral - 中性色 (Warm Slate) */
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
+  /* ── 4. 中性色 (Neutral) — 暖灰 Warm Slate ── */
+  --color-neutral-50: #fafaf9;
+  --color-neutral-100: #f5f3f0;
+  --color-neutral-200: #e7e5e2;
+  --color-neutral-300: #d6d3d0;
+  --color-neutral-400: #a8a39c;
+  --color-neutral-500: #78736c;
+  --color-neutral-600: #57534a;
+  --color-neutral-700: #44403a;
+  --color-neutral-800: #292524;
+  --color-neutral-900: #1c1917;
 
-  /* Accent - 点缀色 (Coral / Gold) */
-  --color-accent-coral: #ff6b6b;
-  --color-accent-gold: #f0a500;
-  --color-accent-mint: #00d2a0;
+  /* ── 5. 点睛色 (Vibrant Pops) ── */
+  --color-coral: #ff6b6b;
+  --color-coral-soft: #ff8e8e;
+  --color-mint: #00d2a0;
+  --color-sky: #38bdf8;
+  --color-rose: #fb7185;
 
-  /* Background - 背景色系 */
-  --color-bg-primary: #f7f8fc;
-  --color-bg-secondary: var(--color-primary-50);
-  --color-bg-card: #ffffff;
-  --color-bg-overlay: rgba(15, 23, 42, 0.55);
-  --color-bg-page: #f0f2f8;
+  /* ── 6. 背景系统 (Background) ── */
+  --color-bg-page: #faf8f5;             /* 暖纸白 */
+  --color-bg-primary: #faf8f5;
+  --color-bg-secondary: #f3efe8;        /* 浅牛皮纸 */
+  --color-bg-card: #fefdfb;             /* 卡片白 */
+  --color-bg-overlay: rgba(28, 25, 23, 0.55);
+  --color-bg-ink: #1e1b2e;              /* 深墨蓝底(暗模式卡片) */
+  --color-bg-glow: rgba(245, 158, 11, 0.06); /* 琥珀光晕 */
+  --color-bg-success-soft: rgba(16, 185, 129, 0.06);
+  --color-bg-danger-soft: rgba(225, 29, 72, 0.05);
+  --color-bg-warning-soft: rgba(245, 158, 11, 0.06);
 
-  /* Text - 文本色系 */
-  --color-text-primary: var(--color-neutral-900);
-  --color-text-secondary: var(--color-neutral-600);
-  --color-text-tertiary: var(--color-neutral-400);
-  --color-text-muted: var(--color-neutral-400);
+  /* Header & Nav */
+  --header-bg: rgba(254, 253, 251, 0.78);
+  --sidebar-bg: rgba(254, 253, 251, 0.88);
+  --bottom-nav-bg: rgba(254, 253, 251, 0.92);
+
+  /* ── 7. 文本系统 (Text) ── */
+  --color-text-primary: #1c1917;        /* 墨黑 */
+  --color-text-secondary: #57534a;      /* 暖灰 */
+  --color-text-tertiary: #a8a39c;       /* 浅灰 */
+  --color-text-muted: #a8a39c;
+  --color-text-ink: #e8e4f0;            /* 深底上的浅字 */
+  --color-text-ink-secondary: #a09ab8;
   --color-text-white: #ffffff;
 
-  /* Border - 边框色系 */
-  --color-border: rgba(108, 92, 231, 0.10);
-  --color-border-light: rgba(108, 92, 231, 0.05);
-  --color-border-focus: rgba(108, 92, 231, 0.35);
-  --color-border-strong: rgba(108, 92, 231, 0.18);
+  /* ── 8. 边框系统 (Border) ── */
+  --color-border: rgba(120, 115, 108, 0.12);
+  --color-border-light: rgba(120, 115, 108, 0.06);
+  --color-border-focus: rgba(124, 58, 237, 0.3);
+  --color-border-strong: rgba(120, 115, 108, 0.2);
+  --color-border-glow: rgba(245, 158, 11, 0.3);  /* 琥珀光晕边框 */
 
-  /* ------------------------------
-   * 2. 排版系统 (Typography)
-   * ------------------------------ */
-
-  /* Font Family - 字体栈 */
+  /* ── 9. 字体系统 (Typography) ── */
   --font-family-sans: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-serif: 'Noto Serif SC', 'Source Han Serif SC', 'SimSun',
+    'STSong', Georgia, serif;
   --font-family-display: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     -apple-system, BlinkMacSystemFont, sans-serif;
   --font-family-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code',
     'Consolas', monospace;
 
-  /* Font Size - 字号体系 */
-  --font-size-xs: 0.75rem;      /* 12px */
-  --font-size-sm: 0.8125rem;    /* 13px */
-  --font-size-base: 0.9375rem;  /* 15px */
-  --font-size-lg: 1.0625rem;    /* 17px */
-  --font-size-xl: 1.25rem;      /* 20px */
-  --font-size-2xl: 1.5rem;      /* 24px */
-  --font-size-3xl: 1.875rem;    /* 30px */
-  --font-size-4xl: 2.25rem;     /* 36px */
-  --font-size-5xl: 3rem;        /* 48px */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.0625rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  --font-size-5xl: 3rem;
 
-  /* Font Weight - 字重 */
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
   --font-weight-extrabold: 800;
 
-  /* Line Height - 行高 */
   --line-height-tight: 1.25;
-  --line-height-normal: 1.6;
+  --line-height-normal: 1.65;
   --line-height-relaxed: 1.75;
   --line-height-loose: 2;
 
-  /* Letter Spacing - 字间距 */
   --letter-spacing-tight: -0.02em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.02em;
-  --letter-spacing-wider: 0.05em;
+  --letter-spacing-wider: 0.06em;
 
-  /* ------------------------------
-   * 3. 间距系统 (Spacing)
-   * ------------------------------ */
-
+  /* ── 10. 间距 (Spacing) ── */
   --spacing-0: 0;
-  --spacing-0\\.5: 0.125rem;
   --spacing-1: 0.25rem;
-  --spacing-1\\.5: 0.375rem;
   --spacing-2: 0.5rem;
-  --spacing-2\\.5: 0.625rem;
   --spacing-3: 0.75rem;
-  --spacing-3\\.5: 0.875rem;
   --spacing-4: 1rem;
   --spacing-5: 1.25rem;
   --spacing-6: 1.5rem;
@@ -190,59 +186,51 @@
   --spacing-20: 5rem;
   --spacing-24: 6rem;
 
-  /* ------------------------------
-   * 4. 圆角系统 (Radius)
-   * ------------------------------ */
-
-  --radius-xs: 0.25rem;     /* 4px */
-  --radius-sm: 0.375rem;    /* 6px */
-  --radius-md: 0.5rem;      /* 8px */
-  --radius-lg: 0.75rem;     /* 12px */
-  --radius-xl: 1rem;        /* 16px */
-  --radius-2xl: 1.25rem;    /* 20px */
-  --radius-3xl: 1.5rem;     /* 24px */
+  /* ── 11. 圆角 (Radius) — 更柔和 ── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
   --radius-full: 9999px;
 
-  /* ------------------------------
-   * 5. 阴影系统 (Shadow)
-   * ------------------------------ */
+  /* ── 12. 阴影 (Shadow) — 暖调阴影 ── */
+  --shadow-xs: 0 1px 2px 0 rgba(28, 25, 23, 0.03);
+  --shadow-sm: 0 1px 3px 0 rgba(28, 25, 23, 0.04), 0 1px 2px rgba(28, 25, 23, 0.03);
+  --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.05), 0 2px 4px rgba(28, 25, 23, 0.03);
+  --shadow-lg: 0 12px 24px rgba(28, 25, 23, 0.06), 0 4px 8px rgba(28, 25, 23, 0.03);
+  --shadow-xl: 0 20px 40px rgba(28, 25, 23, 0.08), 0 8px 16px rgba(28, 25, 23, 0.04);
+  --shadow-card-hover: 0 8px 30px rgba(28, 25, 23, 0.08), 0 2px 8px rgba(28, 25, 23, 0.04);
 
-  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
-  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-  --shadow-2xl: 0 25px 50px -12px rgba(15, 23, 42, 0.12);
-  --shadow-glow-sm: 0 0 20px rgba(108, 92, 231, 0.12);
-  --shadow-glow-md: 0 0 40px rgba(108, 92, 231, 0.18);
-  --shadow-glow-lg: 0 0 60px rgba(108, 92, 231, 0.25);
-  --shadow-card-hover: 0 8px 30px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06);
+  /* 琥珀光晕 */
+  --shadow-glow-amber: 0 0 30px rgba(245, 158, 11, 0.12), 0 0 60px rgba(245, 158, 11, 0.06);
+  --shadow-glow-violet: 0 0 30px rgba(124, 58, 237, 0.12), 0 0 60px rgba(124, 58, 237, 0.06);
+  --shadow-glow-success: 0 0 20px rgba(16, 185, 129, 0.12);
 
-  /* ------------------------------
-   * 6. 玻璃态效果 (Glassmorphism)
-   * ------------------------------ */
+  /* ── 13. 表面效果 (Surfaces) ── */
+  --surface-paper-bg: #fefdfb;
+  --surface-paper-border: rgba(120, 115, 108, 0.1);
+  --surface-paper-shadow: var(--shadow-sm);
 
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-bg-strong: rgba(255, 255, 255, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-shadow: 0 8px 32px rgba(108, 92, 231, 0.06);
-  --glass-blur: blur(20px);
-  --glass-saturate: saturate(180%);
+  --surface-glow-bg: #fffdf7;
+  --surface-glow-border: rgba(245, 158, 11, 0.2);
+  --surface-glow-shadow: var(--shadow-glow-amber);
 
-  /* ------------------------------
-   * 7. 过渡动画 (Transition)
-   * ------------------------------ */
+  --surface-ink-bg: #1e1b2e;
+  --surface-ink-border: rgba(124, 58, 237, 0.2);
+  --surface-ink-text: #e8e4f0;
+  --surface-ink-text-secondary: #a09ab8;
 
+  /* ── 14. 过渡 (Transitions) ── */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
   --transition-spring: 500ms cubic-bezier(0.22, 1.2, 0.36, 1);
 
-  /* ------------------------------
-   * 8. Z-Index 层级
-   * ------------------------------ */
-
+  /* ── 15. Z-Index ── */
   --z-0: 0;
   --z-10: 10;
   --z-20: 20;
@@ -253,38 +241,38 @@
   --z-max: 9999;
 }
 
-/* ============================================
- * 渐变预设 (Gradient Presets)
- * ============================================ */
+/* ============================================================
+ * 渐变预设 — 暖调方向
+ * ============================================================ */
 
 :root {
-  --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #6366f1 50%, #4f46e5 100%);
-  --gradient-primary-light: linear-gradient(135deg, #8f7fff 0%, #818cf8 100%);
-  --gradient-primary-soft: linear-gradient(135deg, rgba(108, 92, 231, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%);
-  --gradient-secondary: linear-gradient(135deg, #2dd4bf 0%, #0d9488 100%);
+  --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  --gradient-primary-light: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  --gradient-amber: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+  --gradient-amber-light: linear-gradient(135deg, #fde68a 0%, #fbbf24 100%);
+  --gradient-warm-mix: linear-gradient(135deg, #7c3aed 0%, #c4b5fd 40%, #fbbf24 100%);
   --gradient-success: linear-gradient(135deg, #34d399 0%, #059669 100%);
-  --gradient-warning: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
   --gradient-danger: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
-  --gradient-info: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-  --gradient-text: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
-  --gradient-text-warm: linear-gradient(135deg, #7c3aed 0%, #f0a500 100%);
-  --gradient-bg: linear-gradient(180deg,
-    rgba(108, 92, 231, 0.03) 0%,
-    rgba(99, 102, 241, 0.02) 30%,
-    rgba(45, 212, 191, 0.02) 70%,
-    rgba(15, 23, 42, 0.01) 100%);
-  --gradient-bg-hero: linear-gradient(180deg,
-    rgba(108, 92, 231, 0.06) 0%,
-    rgba(108, 92, 231, 0.02) 50%,
+  --gradient-ink: linear-gradient(180deg, #1e1b2e 0%, #2d2440 100%);
+  --gradient-ink-warm: linear-gradient(180deg, #1e1b2e 0%, #2a1f30 100%);
+  --gradient-text: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  --gradient-text-warm: linear-gradient(135deg, #7c3aed 0%, #f59e0b 100%);
+  --gradient-bg-warm: linear-gradient(180deg,
+    rgba(245, 158, 11, 0.03) 0%,
+    rgba(124, 58, 237, 0.02) 40%,
     transparent 100%);
-  --gradient-card-accent: linear-gradient(135deg,
-    rgba(108, 92, 231, 0.06) 0%,
-    rgba(45, 212, 191, 0.04) 100%);
+  --gradient-hero: linear-gradient(180deg,
+    rgba(124, 58, 237, 0.04) 0%,
+    rgba(245, 158, 11, 0.02) 30%,
+    transparent 70%);
+  --gradient-card-glow: linear-gradient(135deg,
+    rgba(245, 158, 11, 0.04) 0%,
+    rgba(124, 58, 237, 0.02) 100%);
 }
 
-/* ============================================
- * 响应式断点调优 (Responsive Tuning)
- * ============================================ */
+/* ============================================================
+ * 响应式微调
+ * ============================================================ */
 
 @layer utilities {
   @media (min-width: 1280px) {

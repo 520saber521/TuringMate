@@ -120,9 +120,15 @@ class DiagnosticianAgent:
             return self._generate_fallback_report(student_data)
 
     async def _collect_student_data(self, user_id: str) -> dict:
-        """收集学生数据（MVP 阶段模拟 + 真实数据接入点）."""
+        """收集学生数据 — 从数据库查询真实错题记录."""
+        from app.models.database import SessionLocal
+        from app.crud.diagnosis import diagnosis_crud
+
+        subject_names = [("ds", "数据结构"), ("co", "计组"), ("os", "操作系统"), ("cn", "网络")]
+
+        # 知识图谱知识节点
         subjects_data = {}
-        for prefix, name in [("ds", "数据结构"), ("co", "计组"), ("os", "操作系统"), ("cn", "网络")]:
+        for _prefix, name in subject_names:
             try:
                 result = await knowledge_graph.ainvoke({"action": "get_nodes", "subject": name})
                 nodes = result.get("nodes", [])
@@ -130,42 +136,53 @@ class DiagnosticianAgent:
             except Exception:
                 subjects_data[name] = []
 
-        mock_mistakes = {
-            "数据结构": [
-                {"topic": "链表操作", "count": 3, "last_wrong": "2026-05-10"},
-                {"topic": "二叉树遍历", "count": 2, "last_wrong": "2026-05-08"},
-                {"topic": "快速排序", "count": 1, "last_wrong": "2026-05-12"},
-                {"topic": "哈希表冲突解决", "count": 1, "last_wrong": "2026-05-13"},
-            ],
-            "计组": [
-                {"topic": "浮点数表示", "count": 4, "last_wrong": "2026-05-11"},
-                {"topic": "指令流水线", "count": 2, "last_wrong": "2026-05-09"},
-                {"topic": "Cache 映射", "count": 2, "last_wrong": "2026-05-07"},
-            ],
-            "操作系统": [
-                {"topic": "进程调度算法", "count": 2, "last_wrong": "2026-05-06"},
-                {"topic": "死锁检测", "count": 1, "last_wrong": "2026-05-11"},
-                {"topic": "页面置换算法", "count": 3, "last_wrong": "2026-05-14"},
-            ],
-            "网络": [
-                {"topic": "TCP拥塞控制", "count": 5, "last_wrong": "2026-05-13"},
-                {"topic": "子网划分", "count": 3, "last_wrong": "2026-05-10"},
-                {"topic": "DNS解析过程", "count": 2, "last_wrong": "2026-05-08"},
-                {"topic": "HTTP协议", "count": 1, "last_wrong": "2026-05-12"},
-            ],
-        }
+        # 从数据库查询真实错题数据
+        db = SessionLocal()
+        try:
+            mistakes = diagnosis_crud.list_mistakes_by_user(db, user_id, limit=200)
+            total_practices = len(mistakes)
 
-        total_mistakes = sum(len(v) for v in mock_mistakes.values())
+            # 按科目和知识点聚合错误统计
+            mistake_summary: dict[str, dict[str, dict]] = {}
+            for m in mistakes:
+                subject = getattr(m, "subject", None)
+                if not subject:
+                    # 尝试从 knowledge_tags 推断科目
+                    tags = m.knowledge_tags or []
+                    subject = tags[0] if tags else "未知"
 
-        return {
-            "user_id": user_id,
-            "total_practices": total_mistakes + 25,
-            "practice_days": 15,
-            "accuracy_rate": round(68.5 + hash(user_id) % 20, 1),
-            "mistake_summary": mock_mistakes,
-            "knowledge_coverage": subjects_data,
-            "data_note": "当前为模拟数据，生产环境需接入数据库",
-        }
+                if subject not in mistake_summary:
+                    mistake_summary[subject] = {}
+                for tag in (m.knowledge_tags or [])[:2]:
+                    if tag not in mistake_summary[subject]:
+                        mistake_summary[subject][tag] = {"count": 0, "last_wrong": ""}
+                    mistake_summary[subject][tag]["count"] += 1
+                    last_date = str(m.created_at.date()) if m.created_at else ""
+                    if last_date > mistake_summary[subject][tag]["last_wrong"]:
+                        mistake_summary[subject][tag]["last_wrong"] = last_date
+
+            # 转换为前端格式
+            formatted_mistakes = {}
+            for subject, topics in mistake_summary.items():
+                formatted_mistakes[subject] = [
+                    {"topic": topic, "count": data["count"], "last_wrong": data["last_wrong"]}
+                    for topic, data in sorted(topics.items(), key=lambda x: -x[1]["count"])[:6]
+                ]
+
+            # 计算正确率
+            correct_count = total_practices - len(mistakes)
+            accuracy_rate = round(correct_count / max(total_practices, 1) * 100, 1)
+
+            return {
+                "user_id": user_id,
+                "total_practices": total_practices,
+                "practice_days": len({str(m.created_at.date()) for m in mistakes if m.created_at}),
+                "accuracy_rate": accuracy_rate,
+                "mistake_summary": formatted_mistakes,
+                "knowledge_coverage": subjects_data,
+            }
+        finally:
+            db.close()
 
     @staticmethod
     def _generate_fallback_report(data: dict = None) -> dict:

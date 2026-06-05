@@ -10,34 +10,38 @@ uvicorn[standard]==0.34.0
 pydantic>=2.0
 pydantic-settings>=2.0
 
-# ── LangChain Full Stack ──
-langchain>=0.3
-langchain-community>=0.3
-langchain-openai>=0.3        # ChatOpenAI (兼容 DeepSeek/Qwen/OpenAI)
-langchain-chroma>=0.1         # ChromaDB 向量存储
-langgraph>=0.2                # Agent 状态图编排
+# ── LangChain Full Stack (兼容版本) ──
+langchain>=0.3.14
+langchain-community>=0.3.14
+langchain-openai>=0.3.14        # ChatOpenAI (兼容 DeepSeek/Qwen/OpenAI)
+langchain-chroma>=0.1.4         # ChromaDB 向量存储
+langgraph>=0.2.60               # Agent 状态图编排
 
 # RAG Pipeline
-langchain-text-splitters>=0.3
-chromadb>=0.5                 # 向量数据库
-pymupdf>=1.24                # PDF 解析
+langchain-text-splitters>=0.3.14
+chromadb>=0.5                   # 向量数据库
+pymupdf>=1.24                   # PDF 解析
 
 # Embedding Models (可选本地)
-sentence-transformers>=2.7   # HuggingFace 本地 embedding
+sentence-transformers>=2.7      # HuggingFace 本地 embedding
 
 # Database
 sqlalchemy>=2.0
-pymysql>=1.1                  # MySQL 驱动
-alembic>=1.14                # 数据库迁移
+pymysql>=1.1                    # MySQL 驱动
+alembic>=1.14                   # 数据库迁移
 
 # Cache & Task Queue
 redis>=5.2
 celery>=5.4
 
 # Tencent Cloud Services (本地开发可暂时注释)
-# cos-sdk-python>=1.9          # COS 对象存储
+# cos-sdk-python>=1.9           # COS 对象存储
+
+# Auth
+bcrypt>=4.0
+python-jose[cryptography]>=3.3
 
 # Utilities
-python-multipart>=0.0.18     # 文件上传
-numpy>=1.26                   # 向量计算
-httpx>=0.28                   # 异步 HTTP 客户端
+python-multipart>=0.0.18        # 文件上传
+numpy>=1.26                     # 向量计算
+httpx>=0.28                     # 异步 HTTP 客户端

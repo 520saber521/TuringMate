@@ -1,0 +1,17 @@
+[
+  {"id": "os_01", "name": "操作系统概述", "difficulty": 1, "category": "概述", "prerequisites": []},
+  {"id": "os_02", "name": "进程与线程", "difficulty": 3, "category": "进程管理", "prerequisites": ["os_01"]},
+  {"id": "os_03", "name": "进程同步与互斥", "difficulty": 4, "category": "进程管理", "prerequisites": ["os_02"]},
+  {"id": "os_04", "name": "死锁检测与避免", "difficulty": 4, "category": "进程管理", "prerequisites": ["os_03"]},
+  {"id": "os_05", "name": "进程调度算法", "difficulty": 3, "category": "进程管理", "prerequisites": ["os_02"]},
+  {"id": "os_06", "name": "内存管理基础", "difficulty": 2, "category": "内存管理", "prerequisites": ["os_01"]},
+  {"id": "os_07", "name": "分区与分页存储", "difficulty": 3, "category": "内存管理", "prerequisites": ["os_06"]},
+  {"id": "os_08", "name": "分段与段页式", "difficulty": 3, "category": "内存管理", "prerequisites": ["os_07"]},
+  {"id": "os_09", "name": "页面置换算法", "difficulty": 4, "category": "内存管理", "prerequisites": ["os_08"]},
+  {"id": "os_10", "name": "文件系统结构", "difficulty": 2, "category": "文件管理", "prerequisites": ["os_01"]},
+  {"id": "os_11", "name": "文件存储与索引", "difficulty": 3, "category": "文件管理", "prerequisites": ["os_10"]},
+  {"id": "os_12", "name": "目录结构与共享", "difficulty": 2, "category": "文件管理", "prerequisites": ["os_10"]},
+  {"id": "os_13", "name": "I/O控制方式", "difficulty": 3, "category": "I/O管理", "prerequisites": ["os_01"]},
+  {"id": "os_14", "name": "磁盘调度算法", "difficulty": 3, "category": "I/O管理", "prerequisites": ["os_13"]},
+  {"id": "os_15", "name": "SPOOLing技术", "difficulty": 2, "category": "I/O管理", "prerequisites": ["os_13"]}
+]

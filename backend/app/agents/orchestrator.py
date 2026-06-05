@@ -22,9 +22,10 @@ from enum import Enum
 from typing import TypedDict, Annotated, AsyncIterator
 from pydantic import BaseModel, Field
 
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage, add_messages
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
+from langgraph.graph.message import add_messages
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnable import RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
