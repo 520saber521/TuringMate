@@ -1,6 +1,6 @@
 """TuringMate Backend - FastAPI Application Entry Point.
 
-包含全局异常处理器注册和 CORS 配置.
+包含全局异常处理器注册、CORS 配置、中间件注册.
 """
 
 from fastapi import FastAPI, Request
@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.utils import api_exception_handler, APIError
+from app.api.middleware import setup_middlewares
 
 
 def create_app() -> FastAPI:
@@ -19,6 +20,10 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    # ── 注册自定义中间件 ──
+    # 请求追踪、日志记录、性能监控
+    setup_middlewares(app)
 
     # ── CORS 配置 ──
     app.add_middleware(

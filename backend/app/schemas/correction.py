@@ -3,6 +3,12 @@ from pydantic import BaseModel
 from typing import Optional
 
 
+class CorrectionRequest(BaseModel):
+    """批改请求."""
+    image_url: str
+    question_id: Optional[str] = None
+
+
 class CorrectionStep(BaseModel):
     """批改步骤."""
     step_no: int
