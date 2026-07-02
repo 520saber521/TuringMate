@@ -25,21 +25,21 @@ export interface ExecutionResult {
 }
 
 export function getChallenges(params?: Record<string, string>) {
-  return apiClient.get<{ challenges: CodeChallenge[]; count: number }>('/code/challenges', { params }).then(r => r.data)
+  return apiClient.get<{ challenges: CodeChallenge[]; count: number }>('/code/challenges', { params })
 }
 
 export function getChallenge(id: string) {
-  return apiClient.get<CodeChallenge>(`/code/challenges/${id}`).then(r => r.data)
+  return apiClient.get<CodeChallenge>(`/code/challenges/${id}`)
 }
 
 export function executeCode(body: { code: string; challenge_id?: string; language?: string }) {
-  return apiClient.post<ExecutionResult>('/code/execute', body).then(r => r.data)
+  return apiClient.post<ExecutionResult>('/code/execute', body)
 }
 
 export function submitAnswer(id: string, body: { code: string; challenge_id?: string; language?: string }) {
-  return apiClient.post<ExecutionResult>(`/code/challenges/${id}/submit`, body).then(r => r.data)
+  return apiClient.post<ExecutionResult>(`/code/challenges/${id}/submit`, body)
 }
 
 export function getExplanation(id: string) {
-  return apiClient.get<{ challenge_id: string; explanation: string }>(`/code/challenges/${id}/explanation`).then(r => r.data)
+  return apiClient.get<{ challenge_id: string; explanation: string }>(`/code/challenges/${id}/explanation`)
 }

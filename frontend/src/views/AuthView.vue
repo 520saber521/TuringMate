@@ -2,16 +2,15 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { 
-  LogIn, 
-  UserPlus, 
-  Eye, 
-  EyeOff, 
-  Sparkles, 
+import {
+  LogIn,
+  UserPlus,
+  Eye,
+  EyeOff,
+  Sparkles,
   ArrowRight,
   GraduationCap,
   Brain,
-  Users,
   FileCheck,
   Target,
   Code2
@@ -150,11 +149,11 @@ function switchMode() {
             </div>
             <div class="feature-item">
               <div class="feature-icon">
-                <Users :size="18" />
+                <Code2 :size="18" />
               </div>
               <div class="feature-text">
-                <span class="feature-title">AI 研友陪伴</span>
-                <span class="feature-desc">虚拟学习伙伴，陪你一起进步</span>
+                <span class="feature-title">代码实战</span>
+                <span class="feature-desc">在线编程环境 + AI 评判</span>
               </div>
             </div>
           </div>

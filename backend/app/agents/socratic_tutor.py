@@ -35,9 +35,7 @@ from app.core.prompts import get_prompt, STAGE_INSTRUCTIONS
 from app.rag.retriever import retriever
 from app.config import settings
 
-# F2: 思维追踪集成
-from app.agents.thinking_tracer import create_tracer, StepType
-# F3: 情绪感知集成
+# F2: 情绪感知集成
 from app.agents.emotion_detector import emotion_detector
 
 logger = logging.getLogger(__name__)
@@ -57,7 +55,7 @@ class TutorStage(str, Enum):
 
 
 class TutorState(TypedDict):
-    """LangGraph 状态定义（含 F2/F3 扩展字段）."""
+    """LangGraph 状态定义（含 F2 扩展字段）."""
     messages: Annotated[list[BaseMessage], add_messages]
     remaining_steps: Annotated[int, operator.add]
     stage: str
@@ -65,7 +63,7 @@ class TutorState(TypedDict):
     question_context: dict
     rag_context: str
     is_complete: bool
-    # F3: 情绪感知模式覆盖（注入到 system prompt）
+    # F2: 情绪感知模式覆盖（注入到 system prompt）
     emotion_override: str
 
 

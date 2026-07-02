@@ -4,6 +4,8 @@ from app.models.user import User
 from app.models.chat import ChatSession
 from app.models.question import Question
 from app.models.diagnosis import Mistake, DiagnosisReport
+from app.models.knowledge import KnowledgeNode, CrossSubjectEdge
+from app.models.community import Discussion, Reply, DiscussionLike, HotTopic
 
 __all__ = [
     "Base",
@@ -14,4 +16,10 @@ __all__ = [
     "Question",
     "Mistake",
     "DiagnosisReport",
+    "KnowledgeNode",
+    "CrossSubjectEdge",
+    "Discussion",
+    "Reply",
+    "DiscussionLike",
+    "HotTopic",
 ]

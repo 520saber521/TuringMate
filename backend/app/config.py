@@ -1,7 +1,9 @@
 """Application configuration using Pydantic Settings."""
 
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -42,6 +44,13 @@ class Settings(BaseSettings):
     QWEN_BASE_URL: str = "https://dashscope.aliyuncs.com/api/v1"
     DOUBAO_API_KEY: str = ""
     DOUBAO_BASE_URL: str = "https://ark.cn-beijing.volces.com/api/v3"
+
+    # 文档处理服务 (MinerU + Gotenberg)
+    MINERU_BASE_URL: str = "http://localhost:8001"
+    MINERU_API_TOKEN: Optional[str] = None
+    MINERU_TIMEOUT: float = 300.0
+    GOTENBERG_BASE_URL: str = "http://localhost:3000"
+    GOTENBERG_TIMEOUT: float = 120.0
 
     # RAG Configuration
     EMBEDDING_MODEL: str = "text2vec-base-chinese"  # 开发阶段用本地模型

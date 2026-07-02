@@ -45,6 +45,12 @@ const aiExplanation = ref('')
 const aiLoading = ref(false)
 const showTreeBuilder = ref(false)
 
+type BuilderTreeNode = {
+  value: number
+  left: BuilderTreeNode | null
+  right: BuilderTreeNode | null
+}
+
 // ── Derived ──
 
 const selectedAlgo = computed(() => algorithmRegistry.find(a => a.id === selectedId.value) || null)
@@ -86,6 +92,24 @@ const treePresets = [
     json: { value: 1, left: null, right: { value: 2, left: null, right: { value: 3, left: null, right: { value: 4, left: null, right: null } } } },
   },
 ]
+
+const treeBuilderNodes = computed(() => {
+  const nodes: Array<{ value: number; idx: number }> = []
+  try {
+    const tree = JSON.parse(inputRaw.value) as BuilderTreeNode
+    const walk = (node: BuilderTreeNode | null, id: { v: number }) => {
+      if (!node) return
+      nodes.push({ value: node.value, idx: id.v })
+      id.v++
+      walk(node.left, id)
+      walk(node.right, id)
+    }
+    walk(tree, { v: 0 })
+  } catch {
+    return []
+  }
+  return nodes
+})
 
 function selectAlgorithm(id: string) {
   selectedId.value = id
@@ -199,11 +223,11 @@ async function requestAIExplanation() {
   aiLoading.value = true
   aiExplanation.value = ''
   try {
-    const res = await apiClient.post('/chat/message', {
+    const res = await apiClient.post<{ reply?: string; message?: string }>('/chat/message', {
       message: `你是一个408考研算法导师。请用1-2句中文解释这个算法步骤的含义：\n算法：${algo.name}\n步骤：${step.description}\n当前变量：${JSON.stringify(step.variables)}`,
       mode: 'guided',
     })
-    aiExplanation.value = res.data?.reply || res.data?.message || '暂无解释'
+    aiExplanation.value = res.reply || res.message || '暂无解释'
   } catch {
     aiExplanation.value = 'AI 讲解暂不可用，请稍后重试'
   } finally {
@@ -325,7 +349,7 @@ onMounted(() => {
       <p class="text-sm text-text-tertiary">{{ selectedAlgo?.description }}</p>
       <button
         :class="['compare-toggle', { active: compareMode }]"
-        @click="compareMode = !compareMode; if (!compareMode) { compareSteps.value = 0; compareResult.value = '' }"
+        @click="compareMode = !compareMode; if (!compareMode) { compareSteps = 0; compareResult = '' }"
       >
         对比模式
       </button>
@@ -404,7 +428,7 @@ onMounted(() => {
       <div v-if="showTreeBuilder && selectedAlgo?.category === 'tree'" class="tree-builder mt-3 p-3 rounded-xl bg-ink">
         <p class="text-xs text-text-muted mb-2">点击节点按钮添加/删除子节点</p>
         <div class="flex flex-wrap gap-2">
-          <template v-for="(node, i) in (() => { try { const t = JSON.parse(inputRaw.value); const nodes: {value: number, idx: number}[] = []; function walk(n: any, id: {v: number}) { if(!n) return; nodes.push({value: n.value, idx: id.v}); id.v++; walk(n.left, id); walk(n.right, id); } walk(t, {v: 0}); return nodes; } catch { return []; } })()" :key="i">
+          <template v-for="(node, i) in treeBuilderNodes" :key="i">
             <div class="tree-node-chip">
               <span class="text-xs font-mono font-bold text-text-primary">{{ node.value }}</span>
               <button class="tn-btn" @click="addTreeNode(node.idx, 'left')" title="添加左子">+L</button>

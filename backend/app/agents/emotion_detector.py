@@ -24,7 +24,6 @@ from enum import Enum
 from app.schemas.emotion import (
     EmotionState, TeachingMode,
     EmotionEvent, EmotionDetectionResult,
-    StudyBuddyRole,
 )
 
 logger = logging.getLogger(__name__)

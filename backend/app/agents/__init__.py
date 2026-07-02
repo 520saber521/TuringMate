@@ -13,13 +13,11 @@
   - Diagnostician:   薄弱点诊断 (LangChain Chain)
   - Orchestrator:    主调度器 (LangGraph StateGraph)
 
-6 大差异化功能模块 (Features):
+4 大差异化功能模块 (Features):
   - LearningPathPlanner:    F1 动态学习路径规划器
-  - ThinkingTracer:         F2 思维过程可视化回放
-  - EmotionDetector:        F3 情绪感知与状态调节
-  - ProblemGenerator:       F4 「举一反三」题目生成器
-  - StudyBuddyAgent:        F5 AI 研友多角色系统
-  - CodePracticalManager:   F6 「代码即题目」实战模块
+  - EmotionDetector:        F2 情绪感知与状态调节
+  - ProblemGenerator:       F3 「举一反三」题目生成器
+  - CodePracticalManager:   F4 「代码即题目」实战模块
 """
 
 from .socratic_tutor import socratic_tutor_agent, SocraticTutorAgent, TutorStage, TutorState
@@ -31,19 +29,13 @@ from .orchestrator import orchestrator, TuringMateOrchestrator, AgentType, UserI
 # F1: 动态学习路径规划
 from .learning_path_planner import learning_path_planner, LearningPathPlannerAgent
 
-# F2: 思维过程可视化
-from .thinking_tracer import ThinkingTracer, create_tracer
-
-# F3: 情绪感知与状态调节
+# F2: 情绪感知与状态调节
 from .emotion_detector import emotion_detector, EmotionDetector, TeachingMode
 
-# F4: 「举一反三」题目生成
+# F3: 「举一反三」题目生成
 from .problem_generator import problem_generator, ProblemGeneratorAgent
 
-# F5: AI 研友多角色系统
-from .study_buddy import study_buddy_agent, StudyBuddyAgent
-
-# F6: 「代码即题目」实战模块
+# F4: 「代码即题目」实战模块
 from .code_practical import code_practical_manager, code_practical_execute, CodeChallenge, ChallengeType
 
 __all__ = [
@@ -62,12 +54,10 @@ __all__ = [
     # Types
     "TutorStage", "TutorState", "ParsedQuestion",
     "AgentType", "UserIntent",
-    # F1-F6 功能模块
+    # F1-F4 功能模块
     "learning_path_planner", "LearningPathPlannerAgent",
-    "ThinkingTracer", "create_tracer",
     "emotion_detector", "EmotionDetector", "TeachingMode",
     "problem_generator", "ProblemGeneratorAgent",
-    "study_buddy_agent", "StudyBuddyAgent",
     "code_practical_manager", "code_practical_execute",
     "CodeChallenge", "ChallengeType",
 ]

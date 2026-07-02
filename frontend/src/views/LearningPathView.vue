@@ -33,8 +33,10 @@ function togglePhase(index: number) {
   expandedPhase.value = expandedPhase.value === index ? -1 : index
 }
 
-function getSubjectBadge(subject: string) {
-  const map: Record<string, string> = { 'ds': 'primary', 'co': 'warning', 'os': 'success', 'cn': 'amber' }
+type BadgeVariant = 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'amber'
+
+function getSubjectBadge(subject: string): BadgeVariant {
+  const map: Record<string, BadgeVariant> = { 'ds': 'primary', 'co': 'warning', 'os': 'success', 'cn': 'amber' }
   return map[subject] || 'primary'
 }
 

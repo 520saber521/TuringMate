@@ -7,9 +7,9 @@ import { useStudyTimerStore } from '@/stores/studyTimer'
 const route = useRoute()
 const timer = useStudyTimerStore()
 
-// 判断是否为登录页面（独立页面）
+// 判断是否为独立全屏页面（无侧边栏/顶栏）
 const isStandalonePage = computed(() => {
-  return route.path === '/login'
+  return route.path === '/login' || route.path === '/'
 })
 
 // Auto-track: start timer on study pages, pause on non-study pages

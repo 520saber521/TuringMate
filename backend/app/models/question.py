@@ -15,8 +15,13 @@ class Question(Base):
     content = Column(Text, nullable=False)
     image_url = Column(String(500), default="")
     solution_steps = Column(JSON, default=list)
-    source_question_id = Column(String(32), nullable=True)  # for variants
-    variant_of = Column(String(32), nullable=True)  # parent question this is a variant of
+    source_question_id = Column(String(32), nullable=True)
+    variant_of = Column(String(32), nullable=True)
+    year = Column(Integer, nullable=True, index=True)
+    exam_paper = Column(String(100), default="")
+    chapter_order = Column(Integer, nullable=True)
+    source_type = Column(String(20), default="manual")
+    ai_analysis = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     mistakes = relationship("Mistake", back_populates="question")

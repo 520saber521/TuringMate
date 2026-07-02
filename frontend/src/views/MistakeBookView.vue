@@ -28,7 +28,8 @@ const filteredMistakes = computed(() => {
 })
 
 function goToReview(mistake: Mistake) {
-  router.push({ path: '/chat', query: { questionId: mistake.id, subject: mistake.subject } })
+  const questionId = mistake.questionId || mistake.id
+  router.push({ path: `/chat/${questionId}`, query: { subject: mistake.subject } })
 }
 
 function formatDate(ts: number): string {

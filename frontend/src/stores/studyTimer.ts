@@ -18,9 +18,7 @@ const STUDY_ROUTES: Record<string, string> = {
   '/visualize': '代码实战',
   '/code-challenge': '代码挑战',
   '/problem-gen': '举一反三',
-  '/buddy': 'AI研友',
   '/learning-path': '学习规划',
-  '/thinking': '思维训练',
   '/diagnosis': '薄弱诊断',
 }
 
@@ -68,9 +66,7 @@ const SUBJECT_COLORS: Record<string, string> = {
   '代码实战': '#e11d48',
   '代码挑战': '#e11d48',
   '举一反三': '#a78bfa',
-  'AI研友': '#f59e0b',
   '学习规划': '#059669',
-  '思维训练': '#e11d48',
   '薄弱诊断': '#f59e0b',
 }
 

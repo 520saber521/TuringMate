@@ -37,6 +37,10 @@ data/uploads/*.jpg
 data/uploads/*.png
 data/uploads/*.jpeg
 
+# Local SQLite databases (本地状态数据)
+backend/data/*.db
+*.db
+
 # OS
 Thumbs.db
 Desktop.ini

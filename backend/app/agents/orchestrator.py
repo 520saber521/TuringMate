@@ -36,11 +36,10 @@ from .socratic_tutor import socratic_tutor_agent as tutor
 from .question_parser import question_parser_agent as parser
 from .corrector import corrector_agent as corrector
 from .diagnostician import diagnostician_agent as diagnostician
-# 6 大功能模块 Agents
+# 5 大功能模块 Agents
 from .learning_path_planner import learning_path_planner          # F1
 from .problem_generator import problem_generator                   # F4
-from .study_buddy import study_buddy_agent                         # F5
-from .code_practical import code_practical_manager, code_practical_execute  # F6
+from .code_practical import code_practical_manager, code_practical_execute  # F5
 
 logger = logging.getLogger(__name__)
 
@@ -50,22 +49,21 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 class AgentType(str, Enum):
-    """Agent 类型 — 包含核心 Agent + 6 大差异化功能模块."""
+    """Agent 类型 — 包含核心 Agent + 5 大差异化功能模块."""
     # 核心Agent
     QUESTION_PARSER = "question_parser"
     SOCRATIC_TUTOR = "socratic_tutor"
     CORRECTOR = "corrector"
     DIAGNOSTICIAN = "diagnostician"
-    # 6 大功能模块
+    # 5 大功能模块
     LEARNING_PATH_PLANNER = "learning_path_planner"       # F1: 动态路径规划
     PROBLEM_GENERATOR = "problem_generator"               # F4: 举一反三生成器
-    STUDY_BUDDY = "study_buddy"                           # F5: AI研友
-    CODE_PRACTICAL = "code_practical"                     # F6: 代码实战
+    CODE_PRACTICAL = "code_practical"                     # F5: 代码实战
     UNKNOWN = "unknown"
 
 
 class UserIntent(str, Enum):
-    """用户意图 — 扩展支持 6 大新功能."""
+    """用户意图 — 扩展支持 5 大新功能."""
     SEARCH_QUESTION = "search_question"
     START_CHAT = "start_chat"
     CONTINUE_CHAT = "continue_chat"
@@ -75,12 +73,9 @@ class UserIntent(str, Enum):
     ADJUST_PATH = "adjust_path"                           # F1: 调整路径
     GENERATE_VARIANTS = "generate_variants"               # F4: 举一反三
     VALIDATE_MASTERY = "validate_mastery"                 # F4: 验证掌握
-    START_STUDY_GROUP = "start_study_group"               # F5: 启动研友小组
-    BUDDY_CHAT = "buddy_chat"                             # F5: 研友对话
-    CODE_CHALLENGE = "code_challenge"                     # F6: 代码挑战
-    EXECUTE_CODE = "execute_code"                         # F6: 执行代码
-    THINKING_TRACE = "thinking_trace"                     # F2: 思维追踪 (内部)
-    EMOTION_DETECT = "emotion_detect"                     # F3: 情绪检测 (内部)
+    CODE_CHALLENGE = "code_challenge"                     # F4: 代码挑战
+    EXECUTE_CODE = "execute_code"                         # F4: 执行代码
+    EMOTION_DETECT = "emotion_detect"                     # F2: 情绪检测 (内部)
     CODE_VISUALIZE = "code_visualize"
     GENERAL_QA = "general_qa"
 
@@ -166,10 +161,7 @@ def _fallback_classify(user_text: str) -> dict:
     # F4: 举一反三
     if any(kw in lower for kw in ["举一反三", "变式题", "同类题", "类似题目", "再出几道"]):
         return {"intent": "generate_variants", "target_agent": "problem_generator", "raw_input": {}}
-    # F5: AI研友
-    if any(kw in lower for kw in ["研友", "小组讨论", "讨论模式", "ai同学", "一起学"]):
-        return {"intent": "start_study_group", "target_agent": "study_buddy", "raw_input": {}}
-    # F6: 代码实战
+    # F5: 代码实战
     if any(kw in lower for kw in ["代码挑战", "代码题", "写代码", "编程", "debug", "补全"]):
         return {"intent": "code_challenge", "target_agent": "code_practical", "raw_input": {}}
     return {"intent": "general_qa", "target_agent": "socratic_tutor", "raw_input": {}}
@@ -291,44 +283,10 @@ async def exec_problem_generator(state: OrchestratorState) -> dict:
     return {"result": result}
 
 
-async def exec_study_buddy(state: OrchestratorState) -> dict:
-    """F5: 执行 — AI 研友对话."""
-    raw = state.get("raw_input", {})
-    session_id = state.get("session_id")
-    user_msg = ""
-    for m in reversed(state.get("messages", [])):
-        if isinstance(m, HumanMessage):
-            user_msg = m.content
-            break
-    
-    if raw.get("action") == "start" or not session_id or session_id == "default":
-        from app.schemas.emotion import StudyBuddyConfig, StudyBuddyRole
-        roles_raw = raw.get("roles", ["scholar"])
-        role_enums = []
-        for r in roles_raw:
-            try: role_enums.append(StudyBuddyRole(r))
-            except ValueError: pass
-        
-        config = StudyBuddyConfig(
-            roles=role_enums or [StudyBuddyRole.SCHOLAR],
-            topic=raw.get("topic", ""),
-            mode=raw.get("mode", "debate"),
-            difficulty=raw.get("difficulty", "medium"),
-        )
-        result = await study_buddy_agent.start_session(config)
-    elif raw.get("action") == "end":
-        result = await study_buddy_agent.end_session(session_id)
-    else:
-        result = await study_buddy_agent.continue_discussion(
-            session_id=session_id, user_message=user_msg
-        )
-    return {"result": result}
-
-
 async def exec_code_practical(state: OrchestratorState) -> dict:
-    """F6: 执行 — 代码实战挑战."""
+    """F5: 执行 — 代码实战挑战."""
     raw = state.get("raw_input", {})
-    
+
     if raw.get("action") == "execute":
         result = await code_practical_execute.ainvoke({
             "code": raw.get("code", ""),
@@ -359,11 +317,10 @@ AGENT_ROUTER_MAP: dict[str, str] = {
     "socratic_tutor": "exec_socratic_tutor",
     "corrector": "exec_corrector",
     "diagnostician": "exec_diagnostician",
-    # 6 大功能模块
+    # 5 大功能模块
     "learning_path_planner": "exec_learning_path_planner",   # F1
     "problem_generator": "exec_problem_generator",           # F4
-    "study_buddy": "exec_study_buddy",                       # F5
-    "code_practical": "exec_code_practical",                 # F6
+    "code_practical": "exec_code_practical",                 # F5
     # 兜底
     "unknown": "exec_general_qa",
 }
@@ -404,12 +361,11 @@ class TuringMateOrchestrator:
             # 6 大功能模块
             AgentType.LEARNING_PATH_PLANNER: learning_path_planner,
             AgentType.PROBLEM_GENERATOR: problem_generator,
-            AgentType.STUDY_BUDDY: study_buddy_agent,
             AgentType.CODE_PRACTICAL: code_practical_manager,
         }
 
     def _build_graph(self):
-        """构建调度状态图 — 使用条件边分发 (含 6 大功能模块)."""
+        """构建调度状态图 — 使用条件边分发 (含 5 大功能模块)."""
 
         graph = StateGraph(OrchestratorState)
 
@@ -423,10 +379,9 @@ class TuringMateOrchestrator:
         graph.add_node("exec_diagnostician", exec_diagnostician)
         graph.add_node("exec_general_qa", exec_general_qa)
 
-        # 6 大功能模块节点 (F1-F6)
+        # 5 大功能模块节点 (F1-F5)
         graph.add_node("exec_learning_path_planner", exec_learning_path_planner)
         graph.add_node("exec_problem_generator", exec_problem_generator)
-        graph.add_node("exec_study_buddy", exec_study_buddy)
         graph.add_node("exec_code_practical", exec_code_practical)
 
         # ── 边连接 ──
@@ -441,10 +396,9 @@ class TuringMateOrchestrator:
                 "exec_socratic_tutor": "exec_socratic_tutor",
                 "exec_corrector": "exec_corrector",
                 "exec_diagnostician": "exec_diagnostician",
-                # 6 大功能模块路由目标
+                # 5 大功能模块路由目标
                 "exec_learning_path_planner": "exec_learning_path_planner",
                 "exec_problem_generator": "exec_problem_generator",
-                "exec_study_buddy": "exec_study_buddy",
                 "exec_code_practical": "exec_code_practical",
                 # 兜底
                 "exec_general_qa": "exec_general_qa",
@@ -455,9 +409,9 @@ class TuringMateOrchestrator:
         all_exec_nodes = (
             "exec_question_parser", "exec_socratic_tutor",
             "exec_corrector", "exec_diagnostician", "exec_general_qa",
-            # F1-F6
+            # F1-F5
             "exec_learning_path_planner", "exec_problem_generator",
-            "exec_study_buddy", "exec_code_practical",
+            "exec_code_practical",
         )
         for node in all_exec_nodes:
             graph.add_conditional_edges(

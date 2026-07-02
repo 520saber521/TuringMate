@@ -1,4 +1,30 @@
-import axios from 'axios'
+import axios, { type AxiosRequestConfig } from 'axios'
+
+type ApiClient = {
+  get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+}
+
+function getErrorMessage(error: any): string {
+  const detail = error.response?.data?.detail || error.response?.data?.message
+  if (typeof detail === 'string' && detail.trim()) return detail
+
+  if (error.code === 'ECONNABORTED') return '请求超时，请稍后重试'
+  if (!error.response) return '无法连接到服务器，请确认后端服务是否已启动'
+
+  const statusMessages: Record<number, string> = {
+    400: '请求参数有误，请检查后重试',
+    401: '登录已过期，请重新登录',
+    403: '当前账号没有权限执行此操作',
+    404: '没有找到对应数据',
+    500: '服务器暂时不可用，请稍后重试',
+  }
+
+  return statusMessages[error.response.status] || '请求失败，请稍后重试'
+}
 
 const apiClient = axios.create({
   baseURL: '/api/v1',
@@ -47,9 +73,10 @@ apiClient.interceptors.response.use(
       }
     }
 
+    error.userMessage = getErrorMessage(error)
     console.error('[API Error]', error.response?.status, error.response?.data)
     return Promise.reject(error)
   },
 )
 
-export default apiClient
+export default apiClient as ApiClient

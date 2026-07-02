@@ -56,8 +56,8 @@ export interface AlgorithmDef {
   description: string
   timeComplexity: string
   pseudocode: string[]
-  cCode: string
-  pythonCode: string
+  cCode?: string
+  pythonCode?: string
   defaultInput: string    // JSON string
   inputLabel: string
   inputHint: string

@@ -1,14 +1,4 @@
 <script setup lang="ts">
-/**
- * LoginButton — 登录按钮（复用项目 Button 设计体系）
- *
- * 与 Button.vue 统一：
- *  - 相同的设计令牌（--color-primary / --shadow-* / --transition-fast）
- *  - 相同的字重/间距/过渡曲线
- *  - 相同的圆角/尺寸规范
- *
- * 额外能力：状态文字切换、右侧箭头、成功态
- */
 import { computed } from 'vue'
 import { ArrowRight, Loader2, Check } from 'lucide-vue-next'
 
@@ -40,49 +30,10 @@ const emit = defineEmits<{
   (e: 'click', evt: MouseEvent): void
 }>()
 
-/* ───── 尺寸（对齐 Button.vue） ───── */
-const sizeMap: Record<NonNullable<Props['size']>, { h: string; pad: string; text: string; icon: number; gap: string }> = {
-  sm:   { h: 'h-8',    pad: 'px-3',  text: 'text-xs',   icon: 14, gap: 'gap-1.5' },
-  md:   { h: 'h-11',   pad: 'px-4',  text: 'text-sm',   icon: 16, gap: 'gap-2' },
-  lg:   { h: 'h-12',  pad: 'px-6',  text: 'text-base', icon: 18, gap: 'gap-2.5' },
-  xl:   { h: 'h-14',  pad: 'px-8',  text: 'text-lg',   icon: 20, gap: 'gap-3' },
-}
-
-/* ───── 圆角（对齐 Button.vue） ───── */
-const shapeMap: Record<NonNullable<Props['shape']>, string> = {
-  default: 'rounded-xl',
-  pill:    'rounded-full',
-  square:  'rounded-lg aspect-square px-0',
-}
-
-/* ───── 变体（完全复用 Button.vue 的设计令牌） ───── */
-const variantMap: Record<NonNullable<Props['variant']>, string> = {
-  primary: [
-    'bg-[var(--color-primary)] text-[var(--color-text-inverse)]',
-    'border border-[var(--color-primary)]',
-    'shadow-[var(--shadow-md)]',
-    'hover:bg-[var(--color-primary-dark)] hover:border-[var(--color-primary-dark)] hover:shadow-[var(--shadow-lg)]',
-    'active:bg-[var(--color-primary-800)] active:shadow-[var(--shadow-sm)]',
-  ].join(' '),
-  secondary: [
-    'bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]',
-    'border border-[var(--color-border)]',
-    'shadow-[var(--shadow-xs)]',
-    'hover:bg-[var(--color-bg-subtle)] hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-sm)]',
-    'active:bg-[var(--color-neutral-100)] active:shadow-none',
-  ].join(' '),
-  outline: [
-    'bg-transparent text-[var(--color-primary)]',
-    'border border-[var(--color-primary)]/40',
-    'hover:bg-[var(--color-primary)]/[0.04] hover:border-[var(--color-primary)]/60',
-    'active:bg-[var(--color-primary)]/[0.08]',
-  ].join(' '),
-  ghost: [
-    'bg-transparent text-[var(--color-text-secondary)] border border-transparent',
-    'hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-primary)]',
-    'active:bg-[var(--color-neutral-200)]',
-  ].join(' '),
-}
+const iconSize = computed(() => {
+  const map = { sm: 14, md: 16, lg: 18, xl: 20 }
+  return map[props.size]
+})
 
 const displayLabel = computed(() => {
   if (props.loading) return '登录中...'
@@ -99,47 +50,143 @@ function onClick(e: MouseEvent) {
 <template>
   <button
     type="button"
+    class="login-btn"
     :class="[
-      'relative inline-flex items-center justify-center',
-      'font-semibold tracking-[var(--letter-spacing-wide)]',
-      'select-none whitespace-nowrap overflow-hidden',
-      'transition-all duration-[var(--transition-fast)] ease-[cubic-bezier(0.4,0,0.2,1)]',
-      sizeMap[size].h,
-      sizeMap[size].pad,
-      sizeMap[size].text,
-      sizeMap[size].gap,
-      shapeMap[shape],
-      variantMap[variant],
-      fullWidth ? 'w-full' : '',
-      (disabled || loading) ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
-      'active:scale-[0.98]',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-elevated)]',
+      `login-btn--${variant}`,
+      `login-btn--${size}`,
+      `login-btn--${shape}`,
+      {
+        'login-btn--full': fullWidth,
+        'is-disabled': disabled || loading,
+      },
     ]"
     :disabled="disabled || loading"
     :aria-busy="loading || undefined"
     @click="onClick"
   >
-    <!-- Loading Spinner -->
-    <span v-if="loading" class="relative z-10 inline-flex">
-      <Loader2 :size="sizeMap[size].icon" class="animate-spin" />
-    </span>
-
-    <!-- Success Check -->
-    <span v-else-if="success" class="relative z-10 inline-flex">
-      <Check :size="sizeMap[size].icon" :stroke-width="2.5" />
-    </span>
-
-    <!-- 文字 -->
-    <span class="relative z-10 inline-flex items-center">
-      <slot>{{ displayLabel }}</slot>
-    </span>
-
-    <!-- 右侧箭头 -->
-    <span
-      v-if="showArrow && !loading && !success"
-      class="relative z-10 inline-flex transition-transform duration-200 group-hover:translate-x-0.5"
-    >
-      <ArrowRight :size="sizeMap[size].icon" />
-    </span>
+    <Loader2 v-if="loading" :size="iconSize" class="login-btn__spin" />
+    <Check v-else-if="success" :size="iconSize" :stroke-width="2.5" />
+    <span class="login-btn__label"><slot>{{ displayLabel }}</slot></span>
+    <ArrowRight v-if="showArrow && !loading && !success" :size="iconSize" />
   </button>
 </template>
+
+<style scoped>
+.login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.login-btn--sm {
+  height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+}
+
+.login-btn--md {
+  height: 2.25rem;
+  padding: 0 0.9rem;
+  font-size: 0.875rem;
+}
+
+.login-btn--lg {
+  height: 2.75rem;
+  padding: 0 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.login-btn--xl {
+  height: 3.25rem;
+  padding: 0 1.5rem;
+  font-size: 1rem;
+}
+
+.login-btn--default {
+  border-radius: 12px;
+}
+
+.login-btn--pill {
+  border-radius: 999px;
+}
+
+.login-btn--square {
+  aspect-ratio: 1;
+  padding-inline: 0;
+}
+
+.login-btn--full {
+  width: 100%;
+}
+
+.login-btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  border-color: rgba(13, 148, 136, 0.2);
+  box-shadow: 0 12px 24px -16px rgba(13, 148, 136, 0.9);
+}
+
+.login-btn--secondary {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xs);
+}
+
+.login-btn--outline {
+  color: #0d9488;
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(13, 148, 136, 0.32);
+}
+
+.login-btn--ghost {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.login-btn:not(.is-disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px -18px rgba(13, 148, 136, 0.95);
+}
+
+.login-btn:not(.is-disabled):active {
+  transform: translateY(0) scale(0.98);
+}
+
+.login-btn.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.login-btn__spin {
+  animation: loginSpin 0.8s linear infinite;
+}
+
+@keyframes loginSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .login-btn__label {
+    max-width: 4.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+</style>

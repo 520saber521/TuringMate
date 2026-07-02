@@ -1,9 +1,5 @@
 <script setup lang="ts">
-/**
- * GuidedChatView - 苏格拉底式引导对话页面
- * 接入真实后端 API，支持普通模式和 SSE 流式模式
- */
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Lightbulb, SkipForward, Eye, Square, Send, BookmarkPlus } from 'lucide-vue-next'
 import { useChat } from '@/composables/useChat'
@@ -18,7 +14,6 @@ const toastMsg = ref('')
 const props = defineProps<{ questionId?: string }>()
 
 const {
-  sessionId,
   messages,
   currentStage,
   isLoading,
@@ -27,25 +22,29 @@ const {
   error,
   startGuidedChat,
   sendUserMessage,
-  stopStreaming,
   scrollToBottom,
 } = useChat()
 
 const messagesContainer = ref<HTMLElement | null>(null)
 const inputText = ref('')
-const useStreamMode = ref(true) // 默认使用流式
 
-// 从路由获取 questionId
-const effectiveQuestionId = route.query.questionId as string || props.questionId || 'demo'
+const effectiveQuestionId = computed(() =>
+  (route.query.questionId as string) || props.questionId || 'demo'
+)
+
+const assistantRounds = computed(() =>
+  messages.value.filter(m => m.role === 'assistant').length
+)
+
+const stageLabel = computed(() =>
+  currentStage.value === 'COMPLETE' ? '已完成' : currentStage.value
+)
 
 onMounted(async () => {
-  if (effectiveQuestionId) {
-    await startGuidedChat(effectiveQuestionId)
-    scrollToBottom(messagesContainer.value)
-  }
+  await startGuidedChat(effectiveQuestionId.value)
+  scrollToBottom(messagesContainer.value)
 })
 
-// 监听消息变化，自动滚动到底部
 watch(() => messages.value.length, () => {
   scrollToBottom(messagesContainer.value)
 })
@@ -59,25 +58,18 @@ watch(() => {
   }
 })
 
-async function sendMessage_action() {
+async function sendMessageAction() {
   if (!inputText.value.trim() || isLoading.value || isStreaming.value) return
 
   const text = inputText.value.trim()
   inputText.value = ''
-
-  if (useStreamMode.value) {
-    // 流式模式 - 暂时用普通模式替代，因为 SSE 需要后端配合
-    await sendUserMessage(text)
-  } else {
-    await sendUserMessage(text)
-  }
-
+  await sendUserMessage(text)
   scrollToBottom(messagesContainer.value)
 }
 
 function skipHint() {
   inputText.value = '跳过提示，请继续'
-  sendMessage_action()
+  sendMessageAction()
 }
 
 function endChat() {
@@ -87,12 +79,11 @@ function endChat() {
 function addToMistakeBook(aiContent: string, prevUserContent?: string) {
   const subject = (route.query.subject as string) || '数据结构'
   const content = prevUserContent || aiContent.slice(0, 100)
-  const reason = 'AI 提示后仍回答错误'
   mistakeStore.addMistake({
     questionContent: content,
     subject,
     knowledgeTags: [],
-    errorReason: reason,
+    errorReason: 'AI 提示后仍回答错误',
   })
   toastMsg.value = '已加入错题本'
   setTimeout(() => { toastMsg.value = '' }, 2000)
@@ -101,246 +92,569 @@ function addToMistakeBook(aiContent: string, prevUserContent?: string) {
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
-    sendMessage_action()
+    sendMessageAction()
   }
 }
 </script>
 
 <template>
-  <div class="guided-chat-view flex flex-col animate-fade-in-up">
-    <!-- Header bar -->
-    <div class="flex items-center gap-3 px-2 py-3 border-b border-purple-50/80 flex-shrink-0" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(8px);">
-      <button class="w-9 h-9 rounded-xl hover:bg-purple-50 flex items-center justify-center transition-colors active:scale-95" @click="router.back()">
-        <ArrowLeft :size="18" style="color: var(--color-text-secondary)" />
+  <div class="guided-chat-view">
+    <header class="chat-header">
+      <button class="icon-btn" aria-label="返回" @click="router.back()">
+        <ArrowLeft :size="18" />
       </button>
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold truncate" style="color: var(--color-text-primary)">引导式对话</p>
-        <p class="text-xs" style="color: var(--color-text-tertiary)">
-          {{ effectiveQuestionId !== 'demo' ? `题目 #${effectiveQuestionId.slice(-4)}` : '题目解析' }} · 第{{ messages.filter(m => m.role === 'assistant').length }}轮对话
+      <div class="chat-title-block">
+        <p class="chat-title">引导式对话</p>
+        <p class="chat-subtitle">
+          {{ effectiveQuestionId !== 'demo' ? `题目 #${effectiveQuestionId.slice(-4)}` : '题目解析' }}
+          · 第 {{ assistantRounds }} 轮对话
         </p>
       </div>
-      <span
-        class="px-2 py-0.5 rounded-md text-xs font-medium"
-        :style="{
-          background: currentStage === 'COMPLETE' ? 'rgba(16,185,129,0.1)' : 'rgba(108,92,231,0.1)',
-          color: currentStage === 'COMPLETE' ? '#10B981' : '#6C5CE7'
-        }"
-      >
-        {{ currentStage === 'COMPLETE' ? '已完成' : currentStage }}
+      <span class="stage-badge" :class="{ complete: currentStage === 'COMPLETE' }">
+        {{ stageLabel }}
       </span>
-    </div>
+    </header>
 
-    <!-- Toast -->
     <transition name="toast-fade">
       <div v-if="toastMsg" class="toast-bar">{{ toastMsg }}</div>
     </transition>
 
-    <!-- Messages Area -->
-    <div
-      ref="messagesContainer"
-      class="flex-1 overflow-y-auto p-4 space-y-4"
-    >
-      <!-- Error Alert -->
-      <div v-if="error" class="rounded-xl p-4 bg-red-50/80 border border-red-100 text-sm text-red-600 mb-2">
-        <p class="font-medium mb-1">出错了</p>
-        <p class="text-xs">{{ error }}</p>
-        <button class="mt-2 px-3 py-1 rounded-lg bg-red-100 text-red-600 text-xs font-medium hover:bg-red-200 transition-colors" @click="startGuidedChat(effectiveQuestionId)">
-          重试
-        </button>
-      </div>
+    <main ref="messagesContainer" class="messages-area">
+      <section v-if="error" class="error-alert">
+        <p class="error-title">出错了</p>
+        <p>{{ error }}</p>
+        <button class="retry-btn" @click="startGuidedChat(effectiveQuestionId)">重试</button>
+      </section>
 
-      <!-- Chat Bubbles -->
-      <div v-for="(msg, idx) in messages" :key="msg.id" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
-
-        <!-- AI Bubble -->
-        <div v-if="msg.role === 'assistant'" class="max-w-[85%] md:max-w-[70%]">
-          <div class="flex gap-2">
-            <div class="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span class="text-white text-xs font-bold">AI</span>
-            </div>
-            <div>
-              <div
-                :class="[
-                  'rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-line',
-                  msg.stage === 'HINT'
-                    ? '!bg-amber-50/80 border border-amber-100'
-                    : 'bg-white/90 border border-gray-100/80 shadow-sm'
-                ]"
-                style="color: var(--color-text-primary)"
-              >
-                <template v-if="msg.stage === 'HINT'">
-                  <div class="flex items-start gap-1.5 mb-1">
-                    <Lightbulb :size="14" class="mt-0.5 flex-shrink-0 text-amber-500" />
-                    <span class="text-xs font-medium text-amber-600">提示</span>
-                  </div>
-                </template>
-                {{ msg.content }}
-                <span v-if="msg.isStreaming" class="inline-block w-1.5 h-4 bg-purple-400 animate-pulse ml-0.5 align-text-bottom"></span>
+      <article
+        v-for="(msg, idx) in messages"
+        :key="msg.id"
+        class="message-row"
+        :class="msg.role === 'user' ? 'message-row--user' : 'message-row--assistant'"
+      >
+        <template v-if="msg.role === 'assistant'">
+          <div class="ai-avatar">AI</div>
+          <div class="message-stack">
+            <div class="message-bubble ai-bubble" :class="{ hint: msg.stage === 'HINT' }">
+              <div v-if="msg.stage === 'HINT'" class="hint-label">
+                <Lightbulb :size="14" />
+                <span>提示</span>
               </div>
-              <!-- Add to Mistake Book -->
-              <button
-                v-if="!msg.isStreaming && msg.stage && ['HINT', 'PROBE'].includes(msg.stage)"
-                class="mistake-add-btn mt-1.5 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all"
-                @click="addToMistakeBook(msg.content, idx > 0 ? messages[idx - 1]?.content : '')"
-              >
-                <BookmarkPlus :size="12" />
-                加入错题本
-              </button>
+              <p>{{ msg.content }}</p>
+              <span v-if="msg.isStreaming" class="stream-caret"></span>
             </div>
+            <button
+              v-if="!msg.isStreaming && msg.stage && ['HINT', 'PROBE'].includes(msg.stage)"
+              class="mistake-add-btn"
+              @click="addToMistakeBook(msg.content, idx > 0 ? messages[idx - 1]?.content : '')"
+            >
+              <BookmarkPlus :size="13" />
+              加入错题本
+            </button>
           </div>
-        </div>
+        </template>
 
-        <!-- User Bubble -->
-        <div v-else class="max-w-[80%] md:max-w-[65%]">
-          <div class="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed">
-            {{ msg.content }}
-          </div>
+        <div v-else class="message-bubble user-bubble">
+          <p>{{ msg.content }}</p>
+        </div>
+      </article>
+
+      <div v-if="isLoading && !isStreaming" class="message-row message-row--assistant">
+        <div class="ai-avatar">AI</div>
+        <div class="typing-bubble">
+          <span></span>
+          <span></span>
+          <span></span>
         </div>
       </div>
+    </main>
 
-      <!-- Typing Indicator -->
-      <div v-if="isLoading && !isStreaming" class="flex justify-start">
-        <div class="flex gap-2">
-          <div class="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-            <span class="text-white text-xs font-bold">AI</span>
-          </div>
-          <div class="bg-white/90 rounded-2xl px-5 py-3 border border-gray-100/80 shadow-sm flex gap-1.5 items-center">
-            <span class="w-2 h-2 rounded-full bg-purple-300 animate-bounce"></span>
-            <span class="w-2 h-2 rounded-full bg-purple-300 animate-bounce" style="animation-delay: 150ms"></span>
-            <span class="w-2 h-2 rounded-full bg-purple-300 animate-bounce" style="animation-delay: 300ms"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Input Area -->
-    <div class="chat-input-area flex-shrink-0 border-t border-purple-50/80 p-3 lg:p-4">
-      <!-- Toolbar -->
-      <div v-if="!isComplete" class="flex items-center gap-2 mb-2.5 overflow-x-auto scrollbar-hide">
-        <button
-          class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-amber-50 transition-colors text-amber-600 whitespace-nowrap active:scale-95"
-          @click="skipHint"
-        >
-          <SkipForward :size="13" />
+    <footer class="chat-input-area">
+      <div v-if="!isComplete" class="quick-actions">
+        <button class="quick-btn quick-btn--amber" @click="skipHint">
+          <SkipForward :size="14" />
           跳过提示
         </button>
-        <button class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-50 transition-colors text-blue-600 whitespace-nowrap active:scale-95">
-          <Eye :size="13" />
+        <button class="quick-btn quick-btn--blue" type="button">
+          <Eye :size="14" />
           查看关键步骤
         </button>
-        <button
-          class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 transition-colors text-red-500 whitespace-nowrap active:scale-95"
-          @click="endChat"
-        >
-          <Square :size="13" />
+        <button class="quick-btn quick-btn--red" @click="endChat">
+          <Square :size="14" />
           结束对话
         </button>
       </div>
 
-      <!-- Completed Banner -->
-      <div v-else class="mb-2.5 px-4 py-2.5 rounded-xl bg-emerald-50/80 border border-emerald-100 text-center">
-        <p class="text-sm font-medium text-emerald-700">对话已完成，继续加油！</p>
-        <button class="mt-2 px-4 py-1.5 rounded-lg bg-emerald-100 text-emerald-600 text-xs font-medium hover:bg-emerald-200 transition-colors" @click="router.push('/')">
-          返回首页
-        </button>
+      <div v-else class="complete-banner">
+        <p>对话已完成，继续加油！</p>
+        <button @click="router.push('/')">返回首页</button>
       </div>
 
-      <!-- Input Box -->
-      <div class="flex items-end gap-2">
-        <div class="flex-1 relative">
-          <textarea
-            v-model="inputText"
-            :placeholder="isComplete ? '对话已结束' : '输入你的想法...'"
-            :disabled="isComplete || isLoading || isStreaming"
-            rows="1"
-            class="w-full px-4 py-3 rounded-xl border border-gray-200/80 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none resize-none text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style="background: rgba(255,255,255,0.9); color: var(--color-text-primary)"
-            @keydown="handleKeydown"
-          ></textarea>
-        </div>
+      <div class="input-row">
+        <textarea
+          v-model="inputText"
+          :placeholder="isComplete ? '对话已结束' : '输入你的想法...'"
+          :disabled="isComplete || isLoading || isStreaming"
+          rows="1"
+          class="chat-textarea"
+          @keydown="handleKeydown"
+        ></textarea>
         <button
+          class="send-btn"
           :disabled="!inputText.trim() || isLoading || isStreaming || isComplete"
-          :class="[
-            'w-11 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95',
-            (inputText.trim() && !isLoading && !isStreaming && !isComplete)
-              ? 'gradient-primary shadow-md shadow-purple-200/50'
-              : 'bg-gray-100 cursor-not-allowed'
-          ]"
-          @click="sendMessage_action"
+          aria-label="发送"
+          @click="sendMessageAction"
         >
-          <Send v-if="inputText.trim() && !isLoading && !isComplete" :size="18" class="text-white" />
-          <span v-else class="text-gray-400 text-sm">→</span>
+          <Send v-if="inputText.trim() && !isLoading && !isComplete" :size="18" />
+          <span v-else>→</span>
         </button>
       </div>
-    </div>
+    </footer>
   </div>
 </template>
 
 <style scoped>
-.chat-input-area {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+.guided-chat-view {
+  height: min(720px, calc(100vh - 11rem));
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(75, 85, 99, 0.1);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.9)),
+    radial-gradient(circle at 14% 0%, rgba(13, 148, 136, 0.08), transparent 32%);
+  box-shadow: 0 20px 45px -36px rgba(15, 23, 42, 0.44);
 }
 
-@media (max-width: 1023px) {
-  .guided-chat-view {
-    height: calc(100vh - 64px - 72px);
-  }
-  .chat-input-area {
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
-  }
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid rgba(75, 85, 99, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(12px);
 }
 
-@media (min-width: 1024px) {
-  .guided-chat-view {
-    height: calc(100vh - 64px);
-  }
+.icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 12px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
 }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.icon-btn:hover {
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.08);
 }
 
-/* Mistake add button */
+.chat-title-block {
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.chat-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-tertiary);
+}
+
+.stage-badge {
+  flex-shrink: 0;
+  padding: 0.32rem 0.58rem;
+  border-radius: 10px;
+  background: rgba(13, 148, 136, 0.1);
+  color: #0d9488;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.stage-badge.complete {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.15rem;
+}
+
+.error-alert {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 16px;
+  color: #dc2626;
+  background: rgba(254, 242, 242, 0.86);
+}
+
+.error-alert p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.error-title {
+  margin-bottom: 0.25rem !important;
+  font-weight: 800;
+}
+
+.retry-btn {
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  border-radius: 10px;
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.message-row {
+  display: flex;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.message-row--user {
+  justify-content: flex-end;
+}
+
+.message-row--assistant {
+  justify-content: flex-start;
+}
+
+.ai-avatar {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.message-stack {
+  max-width: min(760px, 78%);
+}
+
+.message-bubble {
+  border-radius: 18px;
+  padding: 0.85rem 1rem;
+  font-size: 0.92rem;
+  line-height: 1.72;
+}
+
+.message-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ai-bubble {
+  color: var(--color-text-primary);
+  border: 1px solid rgba(75, 85, 99, 0.09);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px -22px rgba(15, 23, 42, 0.42);
+}
+
+.ai-bubble.hint {
+  border-color: rgba(245, 158, 11, 0.18);
+  background: rgba(255, 251, 235, 0.88);
+}
+
+.user-bubble {
+  max-width: min(680px, 72%);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  box-shadow: 0 12px 24px -18px rgba(13, 148, 136, 0.9);
+}
+
+.hint-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
+  color: #d97706;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.stream-caret {
+  display: inline-block;
+  width: 0.36rem;
+  height: 1rem;
+  margin-left: 0.18rem;
+  vertical-align: text-bottom;
+  background: #0d9488;
+  animation: caretPulse 0.8s infinite;
+}
+
 .mistake-add-btn {
-  color: var(--color-amber-600);
-  background: rgba(245, 158, 11, 0.06);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.55rem;
   border: 1px solid transparent;
-}
-.mistake-add-btn:hover {
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.2);
+  border-radius: 10px;
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.07);
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-/* Toast */
+.mistake-add-btn:hover {
+  border-color: rgba(245, 158, 11, 0.18);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(75, 85, 99, 0.09);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.typing-bubble span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #5eead4;
+  animation: bounce 0.9s infinite;
+}
+
+.typing-bubble span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-bubble span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.chat-input-area {
+  flex-shrink: 0;
+  padding: 0.9rem 1rem 1rem;
+  border-top: 1px solid rgba(75, 85, 99, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(16px) saturate(180%);
+}
+
+.quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  overflow-x: auto;
+}
+
+.quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  flex-shrink: 0;
+  padding: 0.46rem 0.75rem;
+  border: 0;
+  border-radius: 11px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.quick-btn--amber {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.quick-btn--blue {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.09);
+}
+
+.quick-btn--red {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.09);
+}
+
+.complete-banner {
+  margin-bottom: 0.65rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(16, 185, 129, 0.16);
+  border-radius: 16px;
+  text-align: center;
+  background: rgba(236, 253, 245, 0.86);
+}
+
+.complete-banner p {
+  margin: 0 0 0.5rem;
+  color: #047857;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.complete-banner button {
+  padding: 0.42rem 0.9rem;
+  border: 0;
+  border-radius: 10px;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.chat-textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  max-height: 8rem;
+  padding: 0.78rem 0.95rem;
+  border: 1px solid rgba(75, 85, 99, 0.14);
+  border-radius: 14px;
+  outline: none;
+  resize: vertical;
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.chat-textarea:focus {
+  border-color: rgba(13, 148, 136, 0.48);
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1);
+}
+
+.chat-textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.send-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  box-shadow: 0 12px 24px -18px rgba(13, 148, 136, 0.9);
+  cursor: pointer;
+}
+
+.send-btn:disabled {
+  color: #94a3b8;
+  background: #f1f5f9;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .toast-bar {
   position: fixed;
   top: 5rem;
   left: 50%;
-  transform: translateX(-50%);
   z-index: var(--z-50);
-  padding: 0.5rem 1.2rem;
+  transform: translateX(-50%);
+  padding: 0.55rem 1.2rem;
   border-radius: 999px;
-  background: var(--color-primary-600);
   color: white;
+  background: #0d9488;
   font-size: 0.85rem;
-  font-weight: 600;
-  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+  font-weight: 800;
+  box-shadow: 0 12px 24px -16px rgba(13, 148, 136, 0.9);
   pointer-events: none;
 }
-.toast-fade-enter-active { animation: toastIn 0.3s ease; }
-.toast-fade-leave-active { animation: toastOut 0.3s ease; }
-@keyframes toastIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.toast-fade-enter-active {
+  animation: toastIn 0.3s ease;
 }
+
+.toast-fade-leave-active {
+  animation: toastOut 0.3s ease;
+}
+
+@keyframes caretPulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes bounce {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 @keyframes toastOut {
-  from { opacity: 1; transform: translateX(-50%) translateY(0); }
-  to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+@media (max-width: 767px) {
+  .guided-chat-view {
+    height: calc(100vh - 12.5rem);
+    min-height: 520px;
+    border-radius: 18px;
+  }
+
+  .messages-area {
+    padding: 0.9rem;
+  }
+
+  .message-stack,
+  .user-bubble {
+    max-width: 86%;
+  }
+
+  .chat-input-area {
+    padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  }
 }
 </style>

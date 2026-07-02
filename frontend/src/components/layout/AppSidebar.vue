@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * TopNav — 顶部水平导航栏
+ * 替代原侧边栏 AppSidebar
+ * 设计：12 项导航项，桌面端水平排列，移动端横向滚动
+ */
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -11,68 +16,37 @@ import {
   Route,
   BookOpen,
   Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
+  Library,
+  Network,
   Flame,
   Play,
   Pause,
-  Settings,
-  Brain,
-  PanelLeftClose,
-  PanelLeft,
-  Zap,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-vue-next'
-import Progress from '@/components/ui/Progress.vue'
 import { useStudyTimerStore } from '@/stores/studyTimer'
-
-interface Props {
-  collapsed?: boolean
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  collapsed: false,
-})
-
-const emit = defineEmits<{
-  toggle: []
-}>()
 
 const route = useRoute()
 const router = useRouter()
 const timer = useStudyTimerStore()
 
-const editingGoal = ref(false)
-const goalInputValue = ref(timer.goalMinutes)
-
-function startEditGoal() {
-  goalInputValue.value = timer.goalMinutes
-  editingGoal.value = true
-}
-
-function confirmGoal() {
-  const n = Number(goalInputValue.value)
-  if (n >= 10 && n <= 480) {
-    timer.setGoal(n)
-  }
-  editingGoal.value = false
-}
-
-function cancelGoal() {
-  editingGoal.value = false
-}
+// 横向滚动引用
+const navScrollRef = ref<HTMLElement | null>(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(true)
 
 const navItems = [
-  { path: '/', icon: Home, label: '首页', color: '#7c3aed', desc: '返回主页' },
-  { path: '/chat/ask', icon: MessageCircle, label: 'AI 对话', color: '#8b5cf6', desc: '智能问答' },
-  { path: '/camera', icon: Camera, label: '拍照识别', color: '#0ea5e9', desc: '拍照搜题' },
-  { path: '/visualize', icon: Code2, label: '代码实战', color: '#ec4899', desc: '在线编程' },
-  { path: '/problem-gen', icon: Sparkles, label: '举一反三', color: '#a855f7', desc: '智能出题' },
-  { path: '/buddy', icon: Users, label: 'AI 研友', color: '#f59e0b', desc: '学习伙伴' },
-  { path: '/diagnosis', icon: BarChart3, label: '薄弱诊断', color: '#ef4444', desc: '精准分析' },
-  { path: '/mistake-book', icon: BookOpen, label: '错题本', color: '#14b8a6', desc: '查漏补缺' },
-  { path: '/learning-path', icon: Route, label: '学习路径', color: '#22c55e', desc: '规划路线' },
-  { path: '/thinking', icon: Brain, label: '思维回放', color: '#6366f1', desc: '思路还原' },
+  { path: '/home', icon: Home, label: '首页', desc: '回到主页' },
+  { path: '/bank', icon: Library, label: '题库', desc: '海量真题' },
+  { path: '/wiki', icon: Network, label: '知识点', desc: '知识树' },
+  { path: '/community', icon: Users, label: '社区', desc: '讨论交流' },
+  { path: '/chat/ask', icon: MessageCircle, label: 'AI 对话', desc: '智能问答' },
+  { path: '/camera', icon: Camera, label: '拍照识别', desc: '拍照搜题' },
+  { path: '/visualize', icon: Code2, label: '代码实战', desc: '在线编程' },
+  { path: '/problem-gen', icon: Sparkles, label: '举一反三', desc: '智能出题' },
+  { path: '/diagnosis', icon: BarChart3, label: '薄弱诊断', desc: '精准分析' },
+  { path: '/mistake-book', icon: BookOpen, label: '错题本', desc: '查漏补缺' },
+  { path: '/learning-path', icon: Route, label: '学习路径', desc: '规划路线' },
 ]
 
 const activePath = computed(() => {
@@ -84,839 +58,451 @@ function navigate(path: string) {
   if (route.path === path) return
   router.push(path)
 }
+
+function checkScroll() {
+  const el = navScrollRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 4
+  canScrollRight.value = el.scrollLeft < el.scrollWidth - el.clientWidth - 4
+}
+
+function scrollBy(direction: 'left' | 'right') {
+  const el = navScrollRef.value
+  if (!el) return
+  const amount = direction === 'left' ? -200 : 200
+  el.scrollBy({ left: amount, behavior: 'smooth' })
+}
+
+// 滚动到激活项
+function scrollToActive() {
+  const el = navScrollRef.value
+  if (!el) return
+  const activeBtn = el.querySelector('.topnav-item.is-active') as HTMLElement
+  if (activeBtn) {
+    activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }
+}
 </script>
 
 <template>
-  <aside
-    :class="[
-      'sidebar fixed left-0 top-[4.5rem] bottom-0 z-30 hidden lg:flex flex-col transition-all duration-300',
-      collapsed ? 'w-20' : 'w-64',
-    ]"
-  >
-    <!-- Top: Collapse Toggle (按主流设计放在顶部) -->
-    <div class="px-3 pt-3 pb-2 flex-shrink-0">
+  <div class="topnav-bar">
+    <!-- 左侧：导航滚动区 -->
+    <div class="topnav-scroll-wrapper">
       <button
-        class="collapse-btn w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-300 group"
-        :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'"
-        @click="emit('toggle')"
+        v-show="canScrollLeft"
+        class="scroll-btn scroll-btn--left"
+        aria-label="向左滚动"
+        @click="scrollBy('left')"
       >
-        <div class="flex items-center gap-2">
-          <div class="collapse-icon-wrap">
-            <component
-              :is="collapsed ? PanelLeft : PanelLeftClose"
-              :size="18"
-              class="collapse-icon"
-            />
-          </div>
-          <span 
-            v-if="!collapsed"
-            class="collapse-text text-sm font-medium"
-          >
-            收起侧边栏
-          </span>
-        </div>
-        <component
-          v-if="!collapsed"
-          :is="ChevronLeft"
-          :size="16"
-          class="collapse-arrow"
-        />
+        <ChevronLeft :size="16" />
+      </button>
+
+      <nav
+        ref="navScrollRef"
+        class="topnav-scroll"
+        @scroll="checkScroll"
+      >
+        <button
+          v-for="(item, index) in navItems"
+          :key="item.path"
+          :class="['topnav-item', { 'is-active': activePath === item.path }]"
+          :style="{ '--idx': index }"
+          @click="navigate(item.path)"
+        >
+          <!-- 底部激活指示条 -->
+          <span class="active-underline"></span>
+
+          <!-- 图标 -->
+          <component :is="item.icon" :size="16" class="item-icon" />
+
+          <!-- 文字 -->
+          <span class="item-label">{{ item.label }}</span>
+        </button>
+      </nav>
+
+      <button
+        v-show="canScrollRight"
+        class="scroll-btn scroll-btn--right"
+        aria-label="向右滚动"
+        @click="scrollBy('right')"
+      >
+        <ChevronRight :size="16" />
       </button>
     </div>
 
-    <!-- Nav Items -->
-    <nav class="flex-1 px-3 py-2 space-y-1 overflow-y-auto scrollbar-hide">
-      <button
-        v-for="(item, index) in navItems"
-        :key="item.path"
-        :class="[
-          'nav-item group relative flex items-center gap-3 px-3 py-3 rounded-2xl text-sm font-medium transition-all duration-300 ease-out',
-          activePath === item.path
-            ? 'is-active'
-            : 'hover:bg-white/70 text-text-secondary'
-        ]"
-        @click="navigate(item.path)"
-      >
-        <!-- Active indicator bar -->
-        <div
-          v-if="activePath === item.path"
-          class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full transition-all duration-300"
-          :style="{ background: item.color }"
-        ></div>
-
-        <!-- Icon -->
-        <div
-          :class="[
-            'nav-icon-wrapper relative flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300',
-            activePath === item.path
-              ? 'shadow-lg shadow-current/15'
-              : 'group-hover:scale-110 group-hover:shadow-md'
-          ]"
-          :style="{ 
-            background: activePath === item.path ? `${item.color}18` : 'rgba(255,255,255,0.6)',
-            color: activePath === item.path ? item.color : '#9ca3af'
-          }"
-        >
-          <component
-            :is="item.icon"
-            :size="20"
-            class="transition-transform duration-300"
-            :class="activePath === item.path ? '' : 'group-hover:rotate-6'"
-          />
-          
-          <!-- Hover glow effect -->
-          <div 
-            v-if="activePath !== item.path"
-            class="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            :style="{ background: `${item.color}08` }"
-          ></div>
+    <!-- 右侧：今日学习迷你卡 -->
+    <div class="topnav-study">
+      <div class="study-pill">
+        <div class="study-pill__icon" :class="{ active: timer.pomodoroRunning }">
+          <Flame :size="14" />
         </div>
-
-        <!-- Label & Description -->
-        <transition name="fade-slide">
-          <div v-if="!collapsed" class="flex-1 min-w-0 text-left">
-            <div 
-              class="nav-label font-semibold transition-colors duration-200"
-              :style="{ color: activePath === item.path ? item.color : '#374151' }"
-            >
-              {{ item.label }}
-            </div>
-            <div class="nav-desc text-xs text-text-tertiary truncate">
-              {{ item.desc }}
-            </div>
+        <div class="study-pill__body">
+          <div class="study-pill__time-row">
+            <span class="study-pill__time">{{ timer.todayMinutes }}</span>
+            <span class="study-pill__unit">分钟</span>
           </div>
-        </transition>
-        
-        <!-- Active indicator dot (collapsed mode) -->
-        <div 
-          v-if="collapsed && activePath === item.path"
-          class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-          :style="{ background: item.color }"
-        ></div>
-      </button>
-    </nav>
-
-    <!-- Bottom Section — 今日学习 -->
-    <div class="px-3 pt-3 pb-4 border-t border-slate-200/60 flex-shrink-0">
-      <!-- Study Stats (Expanded) -->
-      <div
-        v-if="!collapsed"
-        class="stats-card rounded-2xl p-5"
-      >
-        <!-- Header row -->
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-2">
-            <div class="stats-card__flame-wrap" :class="{ active: timer.pomodoroRunning }">
-              <Flame :size="16" class="stats-card__flame-icon" />
-            </div>
-            <span class="text-sm font-bold text-slate-700">今日学习</span>
-          </div>
-          <span
-            class="text-[11px] px-2.5 py-1 rounded-full font-semibold transition-all duration-300"
-            :class="timer.pomodoroRunning ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-          >
-            {{ timer.pomodoroRunning ? timer.phaseEmoji + ' ' + timer.phaseLabel : '⏸ 已暂停' }}
-          </span>
-        </div>
-
-        <!-- Big time + Ring -->
-        <div class="stats-card__time-row">
-          <div class="stats-card__time-block">
-            <template v-if="timer.pomodoroRunning">
-              <span class="stats-card__time-num stats-card__time-num--pomodoro">{{ timer.pomodoroDisplay }}</span>
-            </template>
-            <template v-else>
-              <span class="stats-card__time-num">{{ timer.todayMinutes }}</span>
-              <span class="stats-card__time-unit">分钟</span>
-            </template>
-          </div>
-
-          <!-- SVG Ring -->
-          <div class="stats-card__ring">
-            <svg viewBox="0 0 72 72" class="stats-card__ring-svg">
-              <circle cx="36" cy="36" r="31" fill="none"
-                stroke="var(--color-border-light)" stroke-width="4" />
-              <circle cx="36" cy="36" r="31" fill="none"
-                stroke="url(#statsRingGrad)" stroke-width="4"
-                stroke-linecap="round"
-                :stroke-dasharray="2 * Math.PI * 31"
-                :stroke-dashoffset="2 * Math.PI * 31 * (1 - timer.progressPercent / 100)"
-                transform="rotate(-90 36 36)"
-                class="stats-card__ring-fill" />
-            </svg>
-            <span class="stats-card__ring-text">
-              <template v-if="timer.pomodoroRunning && timer.pomodoroPhase === 'focus'">🍅</template>
-              <template v-else>{{ timer.progressPercent }}%</template>
-            </span>
-            <defs>
-              <linearGradient id="statsRingGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#8b5cf6" />
-                <stop offset="100%" stop-color="#f59e0b" />
-              </linearGradient>
-            </defs>
+          <div class="study-pill__progress">
+            <div
+              class="study-pill__fill"
+              :style="{ width: `${Math.min(timer.progressPercent, 100)}%` }"
+            ></div>
           </div>
         </div>
-
-        <!-- Goal line -->
-        <div class="stats-card__goal-row">
-          <div v-if="!editingGoal" class="stats-card__goal-display">
-            <button class="stats-card__goal-btn" @click.stop="startEditGoal">
-              <span>目标 {{ timer.goalMinutes }} 分钟/天</span>
-              <Settings :size="11" class="stats-card__goal-gear" />
-            </button>
-          </div>
-          <form v-else class="stats-card__goal-edit" @submit.prevent="confirmGoal">
-            <input
-              v-model.number="goalInputValue"
-              type="number"
-              min="10"
-              max="480"
-              step="5"
-              class="stats-card__goal-input"
-              @keydown.escape="cancelGoal"
-              @blur="confirmGoal"
-            />
-            <span class="stats-card__goal-unit">分钟/天</span>
-            <button type="submit" class="stats-card__goal-confirm">✓</button>
-          </form>
-          <span v-if="timer.isGoalReached" class="stats-card__goal-done">✓ 已达标</span>
-          <span v-else class="stats-card__goal-remain">还差 {{ timer.goalMinutes - timer.todayMinutes }} 分钟</span>
-        </div>
-
-        <!-- Toggle button -->
         <button
-          v-if="timer.pomodoroPhase === 'idle' || !timer.pomodoroRunning"
-          class="stats-card__toggle-btn stats-card__toggle-btn--start"
-          @click.stop="timer.startFocus()"
+          v-if="!timer.pomodoroRunning"
+          class="study-pill__btn study-pill__btn--start"
+          :aria-label="timer.pomodoroPhase === 'idle' ? '开始专注' : '继续专注'"
+          @click="timer.startFocus()"
         >
-          <Play :size="14" />
-          <span>{{ timer.pomodoroPhase === 'idle' ? '开始专注' : '继续专注' }}</span>
+          <Play :size="12" />
         </button>
         <button
           v-else
-          class="stats-card__toggle-btn stats-card__toggle-btn--pause"
-          @click.stop="timer.pausePomodoro()"
+          class="study-pill__btn study-pill__btn--pause"
+          aria-label="暂停"
+          @click="timer.pausePomodoro()"
         >
-          <Pause :size="14" />
-          <span>暂停</span>
+          <Pause :size="12" />
         </button>
-
-        <!-- Daily summary -->
-        <div
-          v-if="!timer.pomodoroRunning && timer.todayMinutes > 5"
-          class="stats-card__summary"
-        >
-          <div class="stats-card__summary-item">
-            <span class="stats-card__summary-val">{{ timer.todayMinutes }}分</span>
-            <span class="stats-card__summary-lbl">今日学习</span>
-          </div>
-          <div class="stats-card__summary-divider"></div>
-          <div class="stats-card__summary-item">
-            <span class="stats-card__summary-val">{{ timer.focusCountToday }}个</span>
-            <span class="stats-card__summary-lbl">番茄完成</span>
-          </div>
-          <div v-if="timer.isGoalReached" class="stats-card__summary-goal-badge">
-            ✓ 今日达标
-          </div>
-        </div>
-
-        <!-- Weekly mini-bars -->
-        <div class="stats-card__week">
-          <div class="stats-card__week-header">
-            <span class="text-[11px] font-medium text-slate-400">本周</span>
-            <span class="text-[11px] text-slate-400">
-              总计 <strong class="text-slate-600">{{ timer.weeklyTotal }}分</strong> · 日均 <strong class="text-slate-600">{{ timer.weeklyAvg }}分</strong>
-            </span>
-          </div>
-          <div class="stats-card__bars">
-            <div
-              v-for="(day, i) in timer.weeklyData"
-              :key="i"
-              class="stats-card__bar-col"
-            >
-              <div class="stats-card__bar-track">
-                <div
-                  class="stats-card__bar-fill"
-                  :class="{ today: day.isToday, reached: day.reached }"
-                  :style="{ height: `${Math.min((day.minutes / timer.goalMinutes) * 100, 100)}%` }"
-                ></div>
-              </div>
-              <span class="stats-card__bar-label" :class="{ today: day.isToday }">{{ day.label }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Streak -->
-        <div v-if="timer.streakDays > 0" class="stats-card__streak">
-          <Flame :size="14" class="stats-card__streak-icon" />
-          <span>连续 <strong>{{ timer.streakDays }}</strong> 天</span>
-        </div>
-      </div>
-
-      <!-- Study Stats (Collapsed) -->
-      <div v-else class="text-center">
-        <div
-          class="stats-collapsed-wrapper relative w-12 h-12 mx-auto rounded-2xl flex items-center justify-center mb-2 transition-all duration-300"
-          :class="timer.isActive ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 shadow-lg shadow-emerald-300/40' : 'bg-gradient-to-br from-amber-400 to-amber-500 shadow-lg shadow-amber-300/40'"
-        >
-          <span class="font-bold text-lg text-white">
-            {{ timer.todayMinutes }}
-          </span>
-          <div 
-            v-if="timer.isActive"
-            class="absolute inset-0 rounded-2xl animate-ping bg-emerald-400 opacity-30"
-          ></div>
-        </div>
-        <p class="text-xs font-medium text-slate-500">分钟</p>
       </div>
     </div>
-  </aside>
+  </div>
 </template>
 
 <style scoped>
-/* ============================
-   SIDEBAR — Modern Glass Effect
-   ============================ */
-.sidebar {
-  background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.9) 100%);
+/* ============================================
+   TOP NAV BAR — 顶部水平导航
+   ============================================ */
+
+.topnav-bar {
+  position: fixed;
+  top: 4.5rem;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  height: 3.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1.25rem;
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-right: 1px solid rgba(148, 163, 184, 0.15);
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-/* ============================
-   COLLAPSE BUTTON - 优化位置到顶部
-   ============================ */
-.collapse-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(168, 85, 247, 0.03) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.1);
-  cursor: pointer;
+@media (min-width: 768px) {
+  .topnav-bar {
+    padding: 0 1.5rem;
+  }
 }
 
-.collapse-btn:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%);
-  border-color: rgba(139, 92, 246, 0.2);
+@media (min-width: 1024px) {
+  .topnav-bar {
+    padding: 0 2rem;
+  }
 }
 
-.collapse-btn:active {
-  transform: scale(0.98);
-}
-
-.collapse-icon-wrap {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.08) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.collapse-btn:hover .collapse-icon-wrap {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(168, 85, 247, 0.15) 100%);
-}
-
-.collapse-icon {
-  color: #8b5cf6;
-  transition: all 0.3s ease;
-}
-
-.collapse-btn:hover .collapse-icon {
-  color: #7c3aed;
-}
-
-.collapse-text {
-  color: #6b7280;
-  transition: color 0.3s ease;
-}
-
-.collapse-btn:hover .collapse-text {
-  color: #4b5563;
-}
-
-.collapse-arrow {
-  color: #9ca3af;
-  transition: all 0.3s ease;
-}
-
-.collapse-btn:hover .collapse-arrow {
-  color: #8b5cf6;
-  transform: translateX(-2px);
-}
-
-/* ============================
-   NAV ITEMS
-   ============================ */
-.nav-item {
+/* ===== 滚动区 ===== */
+.topnav-scroll-wrapper {
+  flex: 1;
+  min-width: 0;
   position: relative;
-  overflow: visible;
-  color: #6b7280;
-}
-
-.nav-item.is-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(168, 85, 247, 0.04) 100%);
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.nav-item::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  opacity: 0;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(245, 158, 11, 0.03));
-  transition: opacity 0.3s ease;
-}
-
-.nav-item:hover::before {
-  opacity: 1;
-}
-
-.active-indicator {
-  box-shadow: 0 0 16px currentColor, 0 0 4px currentColor;
-}
-
-.nav-icon-wrapper {
-  z-index: 1;
-}
-
-.nav-label {
-  font-size: 0.875rem;
-  letter-spacing: -0.01em;
-}
-
-.nav-desc {
-  font-size: 0.7rem;
-  margin-top: 0.1rem;
-  letter-spacing: 0.02em;
-}
-
-/* ============================
-   STATS CARD
-   ============================ */
-.stats-card {
-  background: linear-gradient(135deg,
-    rgba(139, 92, 246, 0.08) 0%,
-    rgba(245, 158, 11, 0.04) 50%,
-    rgba(236, 72, 153, 0.04) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.12);
-  position: relative;
-  overflow: hidden;
-  box-shadow: 
-    0 4px 20px rgba(139, 92, 246, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-.stats-card::before {
-  content: '';
-  position: absolute;
-  top: -30px;
-  right: -30px;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.12), transparent 70%);
-  pointer-events: none;
-}
-
-.stats-card__flame-wrap {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: rgba(245, 158, 11, 0.12);
-  transition: all 0.3s ease;
 }
 
-.stats-card__flame-wrap.active {
-  background: rgba(245, 158, 11, 0.2);
-  animation: flameGlow 1.5s ease-in-out infinite;
-}
-
-.stats-card__flame-icon {
-  color: #f59e0b;
-}
-
-@keyframes flameGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
-}
-
-.stats-card__time-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.stats-card__time-block {
-  display: flex;
-  align-items: baseline;
-  gap: 0.15rem;
-}
-
-.stats-card__time-num {
-  font-size: 2.25rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  background: linear-gradient(135deg, #1f2937 0%, #4b5563 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.stats-card__time-num--pomodoro {
-  font-size: 1.75rem;
-  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.stats-card__time-unit {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #9ca3af;
-}
-
-.stats-card__ring {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  flex-shrink: 0;
-}
-
-.stats-card__ring-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.stats-card__ring-fill {
-  transition: stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.stats-card__ring-text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #6b7280;
-}
-
-.stats-card__goal-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.72rem;
-  color: #9ca3af;
-  margin-bottom: 0.6rem;
-  gap: 0.4rem;
-}
-
-.stats-card__goal-display {
-  flex-shrink: 0;
-}
-
-.stats-card__goal-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: none;
-  border: none;
-  color: #9ca3af;
-  font-size: 0.72rem;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 0.15rem 0.3rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.stats-card__goal-btn:hover {
-  color: #6b7280;
-  background: rgba(139, 92, 246, 0.06);
-}
-
-.stats-card__goal-gear {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  color: #9ca3af;
-}
-
-.stats-card__goal-btn:hover .stats-card__goal-gear {
-  opacity: 1;
-}
-
-.stats-card__goal-edit {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex-shrink: 0;
-}
-
-.stats-card__goal-input {
-  width: 48px;
-  padding: 0.25rem 0.35rem;
-  border: 1.5px solid #a78bfa;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-family: inherit;
-  font-weight: 600;
-  text-align: center;
-  color: #1f2937;
-  background: #fff;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.stats-card__goal-input:focus {
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-}
-
-.stats-card__goal-unit {
-  font-size: 0.65rem;
-  color: #9ca3af;
-  white-space: nowrap;
-}
-
-.stats-card__goal-confirm {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  background: linear-gradient(135deg, #8b5cf6, #a855f7);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.stats-card__goal-confirm:hover {
-  transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-}
-
-.stats-card__goal-done {
-  color: #10b981;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.stats-card__goal-remain {
-  color: #f59e0b;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.stats-card__toggle-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.55rem;
-  border-radius: 12px;
-  border: none;
-  font-size: 0.8rem;
-  font-family: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 0.75rem;
-}
-
-.stats-card__toggle-btn--start {
-  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-}
-
-.stats-card__toggle-btn--start:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
-}
-
-.stats-card__toggle-btn--pause {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  color: #92400e;
-  border: 1px solid rgba(245, 158, 11, 0.2);
-}
-
-.stats-card__toggle-btn--pause:hover {
-  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
-}
-
-.stats-card__summary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 0.6rem 0.5rem;
-  margin-bottom: 0.75rem;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(168, 85, 247, 0.03) 100%);
-  border-radius: 14px;
-  border: 1px solid rgba(139, 92, 246, 0.1);
-  flex-wrap: wrap;
-  animation: summaryIn 0.4s ease;
-}
-
-@keyframes summaryIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.stats-card__summary-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  min-width: 48px;
-}
-
-.stats-card__summary-val {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #1f2937;
-  line-height: 1;
-}
-
-.stats-card__summary-lbl {
-  font-size: 0.6rem;
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-.stats-card__summary-divider {
-  width: 1px;
-  height: 24px;
-  background: rgba(139, 92, 246, 0.15);
-  margin: 0 0.5rem;
-  flex-shrink: 0;
-}
-
-.stats-card__summary-goal-badge {
-  width: 100%;
-  text-align: center;
-  margin-top: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #059669;
-  background: rgba(5, 150, 105, 0.08);
-  padding: 0.25rem 0;
-  border-radius: 999px;
-}
-
-.stats-card__week {
-  margin-bottom: 0.5rem;
-}
-
-.stats-card__week-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.stats-card__bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.25rem;
-  height: 52px;
-}
-
-.stats-card__bar-col {
+.topnav-scroll {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 0.25rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0 0.25rem;
   min-width: 0;
 }
 
-.stats-card__bar-track {
-  width: 100%;
-  height: 36px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  position: relative;
-  overflow: hidden;
+.topnav-scroll::-webkit-scrollbar {
+  display: none;
 }
 
-.stats-card__bar-fill {
+/* 滚动箭头 */
+.scroll-btn {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  border-radius: 999px;
-  background: #e2e8f0;
-  transition: height 0.4s ease;
-  min-height: 2px;
-}
-
-.stats-card__bar-fill.today {
-  background: linear-gradient(180deg, #8b5cf6, #a855f7);
-}
-
-.stats-card__bar-fill.reached {
-  background: #10b981;
-}
-
-.stats-card__bar-fill.today.reached {
-  background: linear-gradient(180deg, #8b5cf6, #10b981);
-}
-
-.stats-card__bar-label {
-  font-size: 0.6rem;
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-.stats-card__bar-label.today {
-  color: #8b5cf6;
-  font-weight: 700;
-}
-
-.stats-card__streak {
+  z-index: 2;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #64748b;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
-  color: #6b7280;
-  margin-top: 0.5rem;
-}
-
-.stats-card__streak-icon {
-  color: #f59e0b;
-}
-
-/* ============================
-   TRANSITIONS
-   ============================ */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.2s ease;
 }
 
-.fade-slide-enter-from,
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-10px);
+.scroll-btn:hover {
+  background: #f8fafc;
+  color: #0d9488;
+  border-color: rgba(13, 148, 136, 0.2);
+}
+
+.scroll-btn--left {
+  left: -0.625rem;
+}
+
+.scroll-btn--right {
+  right: -0.625rem;
+}
+
+/* ===== 导航项 ===== */
+.topnav-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: navFadeIn 0.4s ease backwards;
+  animation-delay: calc(var(--idx) * 25ms);
+}
+
+@keyframes navFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.topnav-item:hover {
+  background: rgba(15, 23, 42, 0.04);
+  color: #0f172a;
+}
+
+/* 激活态 */
+.topnav-item.is-active {
+  background: rgba(13, 148, 136, 0.08);
+  color: #0d9488;
+  font-weight: 600;
+}
+
+.topnav-item.is-active:hover {
+  background: rgba(13, 148, 136, 0.1);
+}
+
+/* 底部激活线 */
+.active-underline {
+  position: absolute;
+  left: 50%;
+  bottom: -0.25rem;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background: #0d9488;
+  border-radius: 999px 999px 0 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.topnav-item.is-active .active-underline {
+  width: 60%;
+}
+
+.item-icon {
+  flex-shrink: 0;
+}
+
+.item-label {
+  letter-spacing: -0.005em;
+}
+
+/* ===== 今日学习胶囊 ===== */
+.topnav-study {
+  flex-shrink: 0;
+}
+
+.study-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+  height: 2.25rem;
+  transition: all 0.2s ease;
+}
+
+.study-pill:hover {
+  background: #f1f5f9;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.study-pill__icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.study-pill__icon.active {
+  background: #0d9488;
+  color: white;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(13, 148, 136, 0); }
+}
+
+.study-pill__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.study-pill__time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  line-height: 1;
+}
+
+.study-pill__time {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-feature-settings: "tnum";
+  line-height: 1;
+}
+
+.study-pill__unit {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.study-pill__progress {
+  width: 60px;
+  height: 3px;
+  background: rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.study-pill__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0d9488, #14b8a6);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.study-pill__btn {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.study-pill__btn--start {
+  background: #0d9488;
+  color: white;
+}
+
+.study-pill__btn--start:hover {
+  background: #0f766e;
+  transform: scale(1.05);
+}
+
+.study-pill__btn--pause {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.study-pill__btn--pause:hover {
+  background: #fde68a;
+}
+
+/* ===== 响应式 ===== */
+
+/* 小屏：紧凑模式，隐藏描述 */
+@media (max-width: 640px) {
+  .topnav-bar {
+    padding: 0 0.75rem;
+    height: 3rem;
+    gap: 0.5rem;
+  }
+
+  .topnav-item {
+    padding: 0.4375rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .study-pill {
+    padding: 0.1875rem 0.4375rem 0.1875rem 0.1875rem;
+    height: 2rem;
+  }
+
+  .study-pill__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .study-pill__time {
+    font-size: 0.75rem;
+  }
+
+  .study-pill__unit {
+    display: none;
+  }
+
+  .study-pill__progress {
+    width: 40px;
+  }
+
+  .study-pill__btn {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+
+/* 中等屏：开始隐藏图标，节省空间 */
+@media (min-width: 641px) and (max-width: 1023px) {
+  .study-pill__progress {
+    width: 50px;
+  }
 }
 </style>

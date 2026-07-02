@@ -51,21 +51,3 @@ class EmotionEvent(BaseModel):
     mode_switch: Optional[TeachingMode] = None
     intervention: str = Field(default="", description="采取的干预措施")
     effectiveness: Optional[str] = None  # "improved" / "no_change" / "worsened"
-
-
-class StudyBuddyRole(str, Enum):
-    """AI研友角色类型."""
-    SCHOLAR = "scholar"           # 学霸型 — 深挖问题、讨论解法
-    STRIVER = "striver"           # 努力型 — 问基础概念、巩固理解
-    DISCUSSANT = "discussant"     # 讨论型 — 多观点碰撞、争议题
-
-
-class StudyBuddyConfig(BaseModel):
-    """研友配置."""
-    roles: list[StudyBuddyRole] = Field(
-        default=[StudyBuddyRole.SCHOLAR],
-        description="启用的研友角色"
-    )
-    topic: str = Field(default="", description="讨论主题/章节")
-    mode: str = Field(default="debate", description="模式: debate(辩论) / collaborative(协作) / quiz(互考)")
-    difficulty: str = Field(default="medium", description="难度级别")

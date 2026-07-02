@@ -1,25 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  Home,
-  Search,
-  MessageCircle,
-  User,
-} from 'lucide-vue-next'
+import { Home, Camera, MessageCircle, User } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 
 const navItems = [
   { path: '/', icon: Home, label: '首页' },
-  { path: '/camera', icon: Search, label: '拍照' },
-  { path: '/chat/demo', icon: MessageCircle, label: '问AI' },
-  { path: '/diagnosis', icon: User, label: '我的' },
+  { path: '/camera', icon: Camera, label: '拍照' },
+  { path: '/chat/ask', icon: MessageCircle, label: '问AI' },
+  { path: '/profile', icon: User, label: '我的' },
 ]
 
 const activePath = computed(() => {
-  if (route.path.startsWith('/chat')) return '/chat/demo'
+  if (route.path.startsWith('/chat')) return '/chat/ask'
   return route.path
 })
 
@@ -30,77 +25,107 @@ function navigate(path: string) {
 </script>
 
 <template>
-  <nav class="bottom-nav fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-    <div class="nav-inner flex items-center justify-around h-14 py-1 px-2 safe-area-bottom">
+  <nav class="bottom-nav">
+    <div class="nav-inner">
       <button
         v-for="item in navItems"
         :key="item.path"
-        :class="[
-          'nav-tab flex flex-col items-center gap-0.5 py-1.5 px-4 rounded-2xl transition-all duration-200 min-w-[60px] active:scale-95',
-          activePath === item.path ? 'is-active' : ''
-        ]"
+        :class="['nav-tab', { 'is-active': activePath === item.path }]"
         :aria-label="item.label"
         @click="navigate(item.path)"
       >
-        <div
-          :class="[
-            'nav-tab__icon-wrap w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-250',
-            activePath === item.path
-              ? 'nav-tab__icon-wrap--active'
-              : 'bg-transparent'
-          ]"
-        >
-          <component
-            :is="item.icon"
-            :size="20"
-            :class="['transition-colors duration-200', activePath === item.path ? 'text-white' : '']"
-            :style="{ color: activePath === item.path ? undefined : 'var(--color-text-tertiary)' }"
-          />
-        </div>
-        <span
-          :class="[
-            'text-[11px] font-medium leading-tight transition-colors duration-200',
-            activePath === item.path ? 'nav-tab__label--active' : ''
-          ]"
-          :style="{ color: activePath === item.path ? undefined : 'var(--color-text-tertiary)' }"
-        >
-          {{ item.label }}
+        <span class="nav-tab__icon">
+          <component :is="item.icon" :size="20" />
         </span>
+        <span class="nav-tab__label">{{ item.label }}</span>
       </button>
     </div>
   </nav>
 </template>
 
 <style scoped>
-/* ============================
-   BOTTOM NAV — 暖纸表面
-   ============================ */
+/* ============================================
+   BOTTOM NAV — 大气简约（仅移动端显示）
+   ============================================ */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
 .nav-inner {
-  background: var(--bottom-nav-bg, rgba(254, 253, 251, 0.88));
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  border-top: 1px solid rgba(120, 115, 108, 0.08);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: 3.5rem;
+  padding: 0 0.5rem;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.safe-area-bottom {
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+.nav-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  position: relative;
 }
 
-/* Active tab background */
+.nav-tab:active {
+  transform: scale(0.96);
+}
+
+.nav-tab__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.nav-tab__label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
 .nav-tab.is-active {
-  background: rgba(124, 58, 237, 0.04);
+  color: #0d9488;
 }
 
-/* Active icon — 暖紫渐变 */
-.nav-tab__icon-wrap--active {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
-  transform: scale(1.05);
+.nav-tab.is-active .nav-tab__icon {
+  background: rgba(13, 148, 136, 0.1);
+  color: #0d9488;
 }
 
-/* Active label */
-.nav-tab__label--active {
-  color: var(--color-primary, #7c3aed);
+.nav-tab.is-active .nav-tab__label {
+  color: #0d9488;
   font-weight: 600;
 }
 </style>

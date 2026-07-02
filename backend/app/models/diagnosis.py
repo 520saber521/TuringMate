@@ -15,6 +15,8 @@ class Mistake(Base):
     error_step = Column(Integer)
     error_type = Column(String(50), default="")
     knowledge_tags = Column(JSON, default=list)
+    reviewed = Column(Integer, default=0)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="mistakes")
